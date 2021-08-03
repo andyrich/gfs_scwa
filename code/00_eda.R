@@ -22,3 +22,16 @@ srp <- filter(b118, Basin_Su_1 == "SANTA ROSA VALLEY - SANTA ROSA PLAIN")
 mapview(list(son, pet, srp))
 
 # load pumpage
+p <- file.path(data_path, "srp", "pumpage", "SRP_future_baseline_qpercell.shp") %>% 
+  st_read() %>% 
+  st_centroid() %>%
+  st_transform(epsg)
+
+# filter outliers to improve vis
+quantile(p$q, 0.95)
+p <- filter(p, q <= quantile(p$q, 0.95))
+
+ggplot() +
+  geom_sf(data = srp) + 
+  geom_sf(data = p, aes(fill = q), alpha = 0.5, cex = 0.5)
+  
