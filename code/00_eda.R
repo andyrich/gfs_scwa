@@ -1,0 +1,23 @@
+# eda
+library(tidyverse)
+library(sf)
+library(here)
+library(mapview)
+
+# source all functions
+walk(list.files(here("code", "functions"), full.names = TRUE), ~source(.x))
+
+# load env vars used across modules as objects in .GlobalEnv
+f_load_dot_env()
+
+# load b118 basins and remove file path
+b118 <- file.path(data_path, "general", "b118", "i08_B118_v6-1.shp") %>% 
+  f_load_b118()
+
+# gsas: petaluma, sonoma valley, santa rosa plain
+son <- filter(b118, Basin_Su_1 == "NAPA-SONOMA VALLEY - SONOMA VALLEY")
+pet <- filter(b118, Basin_Su_1 == "PETALUMA VALLEY")
+srp <- filter(b118, Basin_Su_1 == "SANTA ROSA VALLEY - SANTA ROSA PLAIN")
+mapview(list(son, pet, srp))
+
+# load pumpage
