@@ -11,6 +11,7 @@ walk(list.files(here("code", "functions"), full.names = TRUE), ~source(.x))
 f_load_dot_env()
 
 # load b118 basins and remove file path
+# data from https://water.ca.gov/programs/groundwater-management/bulletin-118
 b118 <- file.path(data_path, "general", "b118", "i08_B118_v6-1.shp") %>% 
   f_load_b118()
 
