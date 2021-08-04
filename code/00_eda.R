@@ -22,7 +22,7 @@ srp <- filter(b118, Basin_Su_1 == "SANTA ROSA VALLEY - SANTA ROSA PLAIN")
 mapview(list(son, pet, srp))
 
 # load pumpage
-p <- file.path(data_path, "srp", "pumpage", "SRP_future_baseline_qpercell.shp") %>% 
+p <- file.path(data_path, "srp", "pumpage", "SRP_future_baseline_qpercell_shallow.shp") %>% 
   st_read() %>% 
   st_centroid() %>%
   st_transform(epsg)
