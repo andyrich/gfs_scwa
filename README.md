@@ -19,7 +19,7 @@ DATA_PATH = "<local path to Dropbox data>"
 EPSG = 3310
 ```
 
-The `DATA_PATH` is where project data dependencies are stored on a synced Dropbox folder. On my computer it's `~/Dropbox (LWA)/project/sonoma_co_gsas_rate_fee`, so my environmental variable is: `DATA_PATH = "~/Dropbox (LWA)/project/sonoma_co_gsas_rate_fee"`. In reality, this can be anywhere, including an external drive for very large data.  
+The `DATA_PATH` is where project data dependencies are stored on a synced Dropbox folder. On my computer it's `~/Dropbox (LWA)/data/sonoma_co_gsas_rate_fee`, so my environmental variable is: `DATA_PATH = "~/Dropbox (LWA)/data/sonoma_co_gsas_rate_fee"`. In reality, this can be anywhere, including an external drive for very large data.  
 
 The `EPSG` is the projection used in this study that all spatial data are standardized to.  
 
