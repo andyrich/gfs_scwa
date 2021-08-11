@@ -27,6 +27,13 @@ p <- file.path(data_path, "srp", "pumpage", "SRP_future_baseline_qpercell_shallo
   st_centroid() %>%
   st_transform(epsg)
 
+# load parcels from public sonoma county data portal
+# https://gis-sonomacounty.hub.arcgis.com/pages/data
+parcel <- st_read(file.path(data_path, "general", "parcel", "Parcels_Public_Shapefile.shp"))
+
+# guide data
+g <- readxl::read_xlsx(file.path(data_path, "srp", "parcel", "Santa Rosa Plain GSA Qualified Parcel List 2021March9.xlsx"))
+
 # filter outliers to improve vis
 quantile(p$q, 0.95)
 p <- filter(p, q <= quantile(p$q, 0.95))
