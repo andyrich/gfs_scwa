@@ -39,16 +39,19 @@ cat("SRP average annual (", glue::glue_collapse(range(p_srp$date), "-"),
     ") pumping in entire aquifer is", 
     mean(p_srp_sum$total_pumpage_af), "AF.")
   
-p_srp_sum %>% 
+p1 <- p_srp_sum %>% 
   ggplot(aes(date, total_pumpage_af)) +
   geom_point() +
   geom_line() +
-  geom_hline(yintercept = mean(p_srp_sum$total_pumpage_af), color = "red")
+  geom_hline(yintercept = mean(p_srp_sum$total_pumpage_af), color = "red") +
+  labs(y = "Pumping (AF/yr)", x = "", 
+       title = "Santa Rosa Plain", 
+       subtitle = "all users, shallow & deep aquifer zones (future baseline scenario, 2021-2070)")
 
 
 # SON pumpage -------------------------------------------------------------
 
-p_son <- map2_df(f_son, c("farm", "m&i_domestic"),
+p_son <- map2_df(f_son, c("agriculture", "M&I plus domestic"),
                  ~read_csv(.x) %>% 
                    mutate(type = .y) %>% 
                    tidyr::separate(date, into = c("year", "month"), 
@@ -64,16 +67,25 @@ p_son %>%
   group_by(type) %>% 
   summarise(mean_pumpage_af = mean(total_pumpage_af))
 
-p_son %>% 
+# mean pumping per user
+son_means <- group_by(p_son, type) %>% 
+  summarise(mean = mean(total_pumpage_af)) %>% 
+  ungroup()
+
+p2 <- p_son %>% 
   ggplot(aes(year, total_pumpage_af)) +
   geom_point() +
   geom_line() +
-  facet_wrap(~type)
+  geom_hline(data = son_means, aes(yintercept = mean), color = "red") +
+  facet_wrap(~type) +
+  labs(y = "Pumping (AF/yr)", x = "", 
+       title = "Sonoma Valley", 
+       subtitle = "(2011-2018)")
 
 
 # PET pumpage -------------------------------------------------------------
 
-p_pet <- map2_df(f_pet, c("ag", "m&i", "domestic"),
+p_pet <- map2_df(f_pet, c("agriculture", "M&I", "domestic"),
                  ~read_csv(.x) %>% 
                    mutate(type = .y) %>% 
                    tidyr::separate(date, into = c("year", "month"), 
@@ -85,14 +97,38 @@ p_pet <- map2_df(f_pet, c("ag", "m&i", "domestic"),
 
 cat("PET average annual (", glue::glue_collapse(range(p_pet$year), "-"),
     ") pumping in entire aquifer:")
+
 p_pet %>% 
   group_by(type) %>% 
   summarise(mean_pumpage_af = mean(total_pumpage_af))
 
-p_pet %>% 
+# mean pumping per user
+pet_means <- group_by(p_pet, type) %>% 
+  summarise(mean = mean(total_pumpage_af)) %>% 
+  ungroup()
+
+p3 <- p_pet %>% 
   ggplot(aes(year, total_pumpage_af)) +
   geom_point() +
   geom_line() +
-  facet_wrap(~type)
+  geom_hline(data = pet_means, aes(yintercept = mean), color = "red") +
+  facet_wrap(~type) +
+  labs(y = "Pumping (AF/yr)", x = "", 
+       title = "Petaluma", 
+       subtitle = "(2011-2018)")
 
 
+# write plots and table ---------------------------------------------------
+
+# plots
+files <- path(data_path, "figures", paste0(c("srp", "son", "pet"), "_pump.png"))
+walk2(list(p1, p2, p3), files, ~ggsave(.y, .x))
+
+# table
+bind_rows(
+  tibble(type = "all", mean = mean(p_srp_sum$total_pumpage_af), gsa = "SRP"),
+  mutate(pet_means, gsa = "PET"),
+  mutate(son_means, gsa = "SON")
+  ) %>% 
+  rename(pumpage_af = mean) %>% 
+  write_csv(path(data_path, "tables/pump.csv"))
