@@ -1,44 +1,42 @@
-# eda
 library(tidyverse)
 library(sf)
 library(here)
 library(mapview)
+library(fs)
 
-# source all functions
-walk(list.files(here("code", "functions"), full.names = TRUE), ~source(.x))
-
-# load env vars used across modules as objects in .GlobalEnv
-f_load_dot_env()
-
-# load b118 basins and remove file path
-# data from https://water.ca.gov/programs/groundwater-management/bulletin-118
-b118 <- file.path(data_path, "general", "b118", "i08_B118_v6-1.shp") %>% 
-  f_load_b118()
+# load data ---------------------------------------------------------------
+# b118 data: https://water.ca.gov/programs/groundwater-management/bulletin-118
+b118_path <- path(data_path, "general/b118/i08_B118_v6-1.shp") 
 
 # gsas: petaluma, sonoma valley, santa rosa plain
-son <- filter(b118, Basin_Su_1 == "NAPA-SONOMA VALLEY - SONOMA VALLEY")
-pet <- filter(b118, Basin_Su_1 == "PETALUMA VALLEY")
-srp <- filter(b118, Basin_Su_1 == "SANTA ROSA VALLEY - SANTA ROSA PLAIN")
+son <- f_load_b118_basin(b118_path, "NAPA-SONOMA VALLEY - SONOMA VALLEY")
+pet <- f_load_b118_basin(b118_path, "PETALUMA VALLEY")
+srp <- f_load_b118_basin(b118_path, "SANTA ROSA VALLEY - SANTA ROSA PLAIN")
 mapview(list(son, pet, srp))
 
-# load pumpage
-p <- file.path(data_path, "srp", "pumpage", "SRP_future_baseline_qpercell_shallow.shp") %>% 
-  st_read() %>% 
-  st_centroid() %>%
-  st_transform(epsg)
+# union of all GSAs
+gsas <- reduce(list(son, pet, srp), st_union) %>% as("Spatial")
 
-# load parcels from public sonoma county data portal
+# parcels from public sonoma county data portal
 # https://gis-sonomacounty.hub.arcgis.com/pages/data
-parcel <- st_read(file.path(data_path, "general", "parcel", "Parcels_Public_Shapefile.shp"))
+parcel <- st_read(path(data_path, "general/parcel/Parcels_Public_Shapefile.shp")) %>% 
+  st_transform(epsg) %>% 
+  st_make_valid() %>% 
+  as("Spatial")
+
+
+# parcels intersected to GSA area -----------------------------------------
+gsa_parcel <- parcel[gsas, ]
+cat(round(nrow(gsa_parcel@data) / nrow(parcel@data) * 100, 2), 
+    "% of Sonoma Co parcels within GSAs.")
+
+# write each intersected parcel to an output file for later use
+walk2(list(son, pet, srp), 
+      glue::glue('{c("son", "pet", "srp")}_parcel.rds'), 
+      ~st_intersection(st_as_sf(gsa_parcel), .x) %>% 
+        write_rds(path(data_path, "data_output", .y))
+      )
 
 # guide data
-g <- readxl::read_xlsx(file.path(data_path, "srp", "parcel", "Santa Rosa Plain GSA Qualified Parcel List 2021March9.xlsx"))
+g <- readxl::read_xlsx(path(data_path, "srp/parcel/Santa Rosa Plain GSA Qualified Parcel List 2021March9.xlsx"))
 
-# filter outliers to improve vis
-quantile(p$q, 0.95)
-p <- filter(p, q <= quantile(p$q, 0.95))
-
-ggplot() +
-  geom_sf(data = srp) + 
-  geom_sf(data = p, aes(fill = q), alpha = 0.5, cex = 0.5)
-  
