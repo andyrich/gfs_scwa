@@ -30,13 +30,9 @@ gsa_parcel <- parcel[gsas, ]
 cat(round(nrow(gsa_parcel@data) / nrow(parcel@data) * 100, 2), 
     "% of Sonoma Co parcels within GSAs.")
 
-# write each intersected parcel to an output file for later use
+# intersect parcels to GSA boundaries and write for later use
 walk2(list(son, pet, srp), 
       glue::glue('{c("son", "pet", "srp")}_parcel.rds'), 
       ~st_intersection(st_as_sf(gsa_parcel), .x) %>% 
         write_rds(path(data_path, "data_output", .y))
       )
-
-# guide data
-g <- readxl::read_xlsx(path(data_path, "srp/parcel/Santa Rosa Plain GSA Qualified Parcel List 2021March9.xlsx"))
-
