@@ -36,7 +36,7 @@ add  <- fields[!fields %in% colnames(pson)]
 rem  <- colnames(pson)[!colnames(pson) %in% fields]
 
 
-# clean -------------------------------------------------------------------
+# rename existing fields --------------------------------------------------
 
 # stage columns from the parcel database, renaming what we can
 pson %>% 
@@ -49,12 +49,6 @@ pson %>%
     MailingAddress2 = MailAdr2,
     MailingAddress3 = MailAdr3,
     MailingAddress4 = MailAdr4,
-    Basin_Boundary_Parcel = NA, 
-    Intersect_GSA_Bndry_Sum_Acres = NA,
-    GSA_Jurisdiction_Prelim = NA,
-    GSA_Jurisdiction_Modified = NA,
-    GSA_Jurisdiction_Mod_Value = NA,
-    GSA_Jurisdiction = NA,
     Recycled_Water_Connection = NA,
     Recycled_Water_Use_Ac-Ft = NA,
     Surface_Water_Connection = NA,
@@ -137,10 +131,26 @@ pson %>%
 # we expect SON overlaps only with PET based on the map below
 # mapview::mapview(list(son, pet, srp)) + mapview::mapview(p) 
 
-# parcels that intersect multiple basins will have duplicate records in databases
-son_pet_boundary_parcels <- pson$APN[pson$APN %in% ppet$APN]
+# parcels that intersect multiple basins have duplicate APN across databases
+boundary_parcels <- pson$APN[pson$APN %in% ppet$APN]
 
 pson <- pson %>% 
-  mutate(Basin_Boundary_Parcel = ifelse(APN %in% son_pet_boundary_parcels,
-                                        "Petaluma Valley", NA))
-
+  mutate(
+    Basin_Boundary_Parcel = ifelse(APN %in% boundary_parcels,
+                                   "Petaluma Valley", NA),
+    # area of the total APN that spans GSAs
+    Intersect_GSA_Bndry_Sum_Acres = ifelse(APN %in% boundary_parcels,
+                                           LndSzAcre, NA),
+    # area of the bisected parcels within the GSA 
+    LndSzAcre = ifelse(APN %in% boundary_parcels,
+                       as.numeric(units::set_units(st_area(geometry), acres)), 
+                       LndSzAcre),
+    # proportion of the APN in this GSA, used to assign a GSA
+    area_prop_apn = LndSzAcre / Intersect_GSA_Bndry_Sum_Acres,
+    GSA_Jurisdiction_Prelim = ifelse(area_prop_apn > 0.5, 
+                                     "Sonoma Valley", "Petaluma Valley"),
+    GSA_Jurisdiction_Modified = NA,
+    GSA_Jurisdiction_Mod_Value = NA, 
+    GSA_Jurisdiction = NA
+    ) %>% 
+  select(-area_prop_apn)
