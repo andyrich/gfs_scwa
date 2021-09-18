@@ -3,6 +3,7 @@ library(sf)
 library(here)
 library(mapview)
 library(fs)
+library(furrr)
 
 # load data ---------------------------------------------------------------
 # b118 data: https://water.ca.gov/programs/groundwater-management/bulletin-118
@@ -22,6 +23,10 @@ gsas <- reduce(list(son, pet, srp), st_union) %>% as("Spatial")
 parcel <- st_read(path(data_path, "general/parcel/Parcels_Public_Shapefile.shp")) %>% 
   st_transform(epsg) %>% 
   st_make_valid() %>% 
+  # some acres are wrong: re-calculate at APN level
+  mutate(LndSzAcre = st_area(geometry) %>% 
+           units::set_units(acres) %>% 
+           as.numeric()) %>% 
   as("Spatial")
 
 
@@ -31,7 +36,8 @@ cat(round(nrow(gsa_parcel@data) / nrow(parcel@data) * 100, 2),
     "% of Sonoma Co parcels within GSAs.")
 
 # intersect parcels to GSA boundaries and write for later use
-walk2(list(son, pet, srp), 
+future::plan(multisession, workers = 3)
+furrr::future_walk2(list(son, pet, srp), 
       glue::glue('{c("son", "pet", "srp")}_parcel.rds'), 
       ~st_intersection(st_as_sf(gsa_parcel), .x) %>% 
         write_rds(path(data_path, "data_output", .y))
