@@ -80,7 +80,7 @@ pson <- pson %>%
                                      "Sonoma Valley", "Petaluma Valley"),
     # intentionally left blank for clients to evaluate and populate
     GSA_Jurisdiction_Modified = NA,
-    GSA_Jurisdiction_Mod_Value = NA, 
+    GSA_Jurisdiction_Mod_Value = NA,
     GSA_Jurisdiction = NA
   ) %>% 
   select(-area_prop_apn)
@@ -88,21 +88,21 @@ pson <- pson %>%
 
 # water sources -----------------------------------------------------------
 
-Recycled_Water_Connection = NA,
-Recycled_Water_Use_Ac-Ft = NA,
-Surface_Water_Connection = NA,
-Surface_Water_Use_Ac-Ft = NA,
-Active_Well = NA,
-Shared_Well = NA,
-Shared_Well_APN = NA,
-Well_Records_Available = NA,
-Onsite_Well = NA,
-Urban_well = NA,
-CA_DrinkingWater_SvcArea_Name = NA,
-CA_DrinkingWater_SvcArea_Within = NA,
-Public_Wat_Connection_Modified = NA,
-Public_Wat_Connection = NA,
-Water_Source_Comment = NA,
+Recycled_Water_Connection
+Recycled_Water_Use_Ac-Ft 
+Surface_Water_Connection 
+Surface_Water_Use_Ac-Ft 
+Active_Well 
+Shared_Well 
+Shared_Well_APN 
+Well_Records_Available 
+Onsite_Well 
+Urban_well 
+CA_DrinkingWater_SvcArea_Name 
+CA_DrinkingWater_SvcArea_Within 
+Public_Wat_Connection_Modified 
+Public_Wat_Connection 
+Water_Source_Comment 
 
 
 
@@ -110,89 +110,89 @@ Water_Source_Comment = NA,
 # residential water use ---------------------------------------------------
 
 
-Water_Use_Residential_Rate_Ac-Ft = NA,
-Residential_Confidence = NA,
-Residential_GW_Use_Assessor_Ac-Ft = NA,
-Res_GW_Use_Modified = NA,
-Res_GW_Use_Modified_Ac_Ft = NA,
-Res_GW_Use_Ac-Ft = NA,
-Res_GW_Use_Comment = NA,
+Water_Use_Residential_Rate_Ac-Ft 
+Residential_Confidence 
+Residential_GW_Use_Assessor_Ac-Ft 
+Res_GW_Use_Modified 
+Res_GW_Use_Modified_Ac_Ft 
+Res_GW_Use_Ac-Ft 
+Res_GW_Use_Comment 
 
 
 
 # commercial water use ----------------------------------------------------
 
-Water_Use_Commercial_Rate_Ac-Ft = NA,
-Commercial_Confidence = NA,
-Commercial_GW_Use_Assessor_Ac-Ft = NA,
-Commercial_GW_Use_Modified = NA,
-Commercial_GW_Use_Modified_Ac-Ft = NA,
-Commercial_GW_Use_Ac-Ft = NA,
-Commercial_GW_Use_Comment = NA,    
+Water_Use_Commercial_Rate_Ac-Ft 
+Commercial_Confidence 
+Commercial_GW_Use_Assessor_Ac-Ft 
+Commercial_GW_Use_Modified 
+Commercial_GW_Use_Modified_Ac-Ft 
+Commercial_GW_Use_Ac-Ft 
+Commercial_GW_Use_Comment     
 
     
 
 # commercial or residential irrigation only -------------------------------
 
-Urban_Irrigation_GW_Use_Prelim_Ac-Ft = NA,
-Urban_Irrigation_Modified = NA,
-Urban_Irrigation_Modified_Ac-Ft = NA,
-Urban_Irrigation_GW_Use_Ac-Ft = NA,
-Urban_Irrigation_GW_Use_Comment = NA,
+Urban_Irrigation_GW_Use_Prelim_Ac-Ft 
+Urban_Irrigation_Modified 
+Urban_Irrigation_Modified_Ac-Ft 
+Urban_Irrigation_GW_Use_Ac-Ft 
+Urban_Irrigation_GW_Use_Comment 
     
 
 # commercial or residential irrigation only -------------------------------
 
-School_Golf_GW_Use_prelim_Ac-Ft = NA,
-School_Golf_Modified = NA,
-School_Golf_Modified_Ac-Ft = NA,
-School_Golf_GW_Use_Ac-Ft = NA,
-School_Golf_GW_Use_Comment = NA,
+School_Golf_GW_Use_prelim_Ac-Ft 
+School_Golf_Modified 
+School_Golf_Modified_Ac-Ft 
+School_Golf_GW_Use_Ac-Ft 
+School_Golf_GW_Use_Comment 
     
 
 # ag water use ------------------------------------------------------------
 
-Grain_Area_Ac = NA,
-Vine_Area_Ac = NA,
-Truck_and_Berry_Crops_Area_Ac = NA,
-Deciduous_Fruit_and_Nuts_Area_Ac = NA,
-Citrus_and_Subtropical_Area_Ac = NA,
-Cannabis_Outdoor_Area_Ac = NA,
-Cannabis_Indoor_Area_Ac = NA,
-Pasture_Area_Ac = NA,
-Grain_rate = NA,
-Vine_rate = NA,
-Truck_and_Berry_Crops_rate = NA,
-Deciduous_Fruit_and_Nuts_rate = NA,
-Citrus_and_Subtropical_rate = NA,
-Cannabis_Outdoor_rate = NA,
-Cannabis_Indoor_rate = NA,
-Pasture_rate = NA,
-Total_Crop_Area_prelim_Ac = NA,
-Total_Crop_Area_Ac = NA,
-Water_Use_Ag_Rate_Ac-Ft = NA,
-Ag_GW_Use_GIS_Ac-Ft = NA,
-Ag_GW_Use_Modified = NA,
-Ag_GW_Use_Modified_Ac_Ft = NA,
-Ag_GW_Use_Ac-Ft = NA,
-Ag_GW_Use_Comment = NA,
+Grain_Area_Ac 
+Vine_Area_Ac 
+Truck_and_Berry_Crops_Area_Ac 
+Deciduous_Fruit_and_Nuts_Area_Ac 
+Citrus_and_Subtropical_Area_Ac 
+Cannabis_Outdoor_Area_Ac 
+Cannabis_Indoor_Area_Ac 
+Pasture_Area_Ac 
+Grain_rate 
+Vine_rate 
+Truck_and_Berry_Crops_rate 
+Deciduous_Fruit_and_Nuts_rate 
+Citrus_and_Subtropical_rate 
+Cannabis_Outdoor_rate 
+Cannabis_Indoor_rate 
+Pasture_rate 
+Total_Crop_Area_prelim_Ac 
+Total_Crop_Area_Ac 
+Water_Use_Ag_Rate_Ac-Ft 
+Ag_GW_Use_GIS_Ac-Ft 
+Ag_GW_Use_Modified 
+Ag_GW_Use_Modified_Ac_Ft 
+Ag_GW_Use_Ac-Ft 
+Ag_GW_Use_Comment 
     
 
 
 # determination for GIS survey --------------------------------------------
 
-Residential_Water_Use_Determination = NA,
-Commercial_Water_Use_Determination = NA,
-Urban_Landscape_Irrigation_Water_Use_Determination = NA,
-Ag_Irrigation_Water_Use_Determination = NA,
-Recycled_Water_Use_Determination = NA,
-Surface_Water_Use_Determination = NA,
-School_GolfCourse_Water_Use_Determination = NA,
+Residential_Water_Use_Determination 
+Commercial_Water_Use_Determination 
+Urban_Landscape_Irrigation_Water_Use_Determination 
+Ag_Irrigation_Water_Use_Determination 
+Recycled_Water_Use_Determination 
+Surface_Water_Use_Determination 
+School_GolfCourse_Water_Use_Determination 
 
     
     
 # determination for GIS survey --------------------------------------------
 
-Total_Groundwater_Use_Ac-Ft = NA,
-Jurisdiction = NA,
-Situs_Address = NA
+Total_Groundwater_Use_Ac-Ft 
+Jurisdiction 
+Situs_Address 
