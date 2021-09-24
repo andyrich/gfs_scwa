@@ -51,7 +51,7 @@ pson <- pson %>%
     MailingAddress3     = MailAdr3,
     MailingAddress4     = MailAdr4
   ) %>% 
-  select(-rem)
+  select(-all_of(rem))
     
 
 # basin boundary parcels --------------------------------------------------
@@ -69,13 +69,13 @@ pson <- pson %>%
                                    "Petaluma Valley", NA),
     # area of the total APN that spans GSAs
     Intersect_GSA_Bndry_Sum_Acres = ifelse(APN %in% boundary_parcels,
-                                           LndSzAcre, NA),
+                                           LandSizeAcres, NA),
     # area of the bisected parcels within the GSA 
-    LndSzAcre = ifelse(APN %in% boundary_parcels,
+    LandSizeAcres = ifelse(APN %in% boundary_parcels,
                        as.numeric(units::set_units(st_area(geometry), acres)), 
-                       LndSzAcre),
+                       LandSizeAcres),
     # proportion of the APN in this GSA, used to assign a GSA
-    area_prop_apn = LndSzAcre / Intersect_GSA_Bndry_Sum_Acres,
+    area_prop_apn = LandSizeAcres / Intersect_GSA_Bndry_Sum_Acres,
     GSA_Jurisdiction_Prelim = ifelse(area_prop_apn > 0.5, 
                                      "Sonoma Valley", "Petaluma Valley"),
     # intentionally left blank for clients to evaluate and populate
@@ -83,6 +83,7 @@ pson <- pson %>%
     GSA_Jurisdiction_Mod_Value = NA,
     GSA_Jurisdiction = NA
   ) %>% 
+  # remove intermediate vars
   select(-area_prop_apn)
 
 
@@ -151,15 +152,48 @@ School_Golf_GW_Use_Comment
     
 
 # ag water use ------------------------------------------------------------
+# Raftelis report document pgs 25-27
 
-Grain_Area_Ac 
-Vine_Area_Ac 
-Truck_and_Berry_Crops_Area_Ac 
-Deciduous_Fruit_and_Nuts_Area_Ac 
-Citrus_and_Subtropical_Area_Ac 
-Cannabis_Outdoor_Area_Ac 
-Cannabis_Indoor_Area_Ac 
-Pasture_Area_Ac 
+# crop data - intersect to son. For reference, crop classes:
+### C = Citrus and subtropical
+### D = Deciduous Fruits and Nuts
+### G = Grain
+### P = Pasture
+### T = Truck Nursery and Berry Crops
+### V = Vineyard
+### X = other
+crop <- path(data_path, "general/crops/i15_Crop_Mapping_2018.shp") %>% 
+  st_read() %>% 
+  filter(COUNTY == "Sonoma") %>% 
+  st_transform(epsg) %>% 
+  st_make_valid() %>% 
+  st_intersection(son) %>% 
+  select(crop_class = CLASS2)
+
+# get crops per apn and recalculate area
+crops_per_apn <- st_intersection(select(pson, APN), crop) %>% 
+  mutate(crop_acres = as.numeric(units::set_units(st_area(geometry), "acres")))
+
+# join back to pson in the specified format
+pson <- pson %>% 
+  left_join(st_drop_geometry(crops_per_apn)) %>% 
+  mutate(
+    Grain_Area_Ac                    = ifelse(crop_class == "G", crop_acres, 0),
+    Vine_Area_Ac                     = ifelse(crop_class == "V", crop_acres, 0),
+    Truck_and_Berry_Crops_Area_Ac    = ifelse(crop_class == "T", crop_acres, 0),
+    Deciduous_Fruit_and_Nuts_Area_Ac = ifelse(crop_class == "D", crop_acres, 0),
+    Citrus_and_Subtropical_Area_Ac   = ifelse(crop_class == "C", crop_acres, 0), 
+    Cannabis_Outdoor_Area_Ac         = 0, # no cannabis
+    Cannabis_Indoor_Area_Ac          = 0, # no cannabis
+    Pasture_Area_Ac                  = ifelse(crop_class == "P", crop_acres, 0)
+  ) %>% 
+  # remove intermediate vars
+  select(-all_of(crop_class, crop_acres))
+
+ 
+ 
+
+ 
 Grain_rate 
 Vine_rate 
 Truck_and_Berry_Crops_rate 
