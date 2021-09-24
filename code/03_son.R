@@ -89,6 +89,27 @@ pson <- pson %>%
 
 # water sources -----------------------------------------------------------
 
+# read ewrims data, filter to SON, transform, select relevant cols
+ewrims <- dir_ls(path(data_path, "general/ewrims")) %>% 
+  read_csv(col_select = c("longitude", "latitude", "face_value_amount", "county"), 
+           col_types = list(
+             longitude         = "d",
+             latitude          = "d",
+             face_value_amount = "d",
+             county            = "c")) %>% 
+  rename(Surface_Water_Use_Ac_Ft = face_value_amount) %>% 
+  filter(county == "Sonoma" | is.na(county)) %>% 
+  # remove a few rows without location data 
+  filter(!is.na(latitude), !is.na(longitude),
+         !is.nan(latitude), !is.nan(longitude)) %>% 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4269) %>% 
+  st_transform(3310) %>% 
+  select(-county)
+
+# add surface water use (AF/year) to parcels 
+pson <- st_intersection(pson, ewrims) %>% 
+  mutate(Surface_Water_Connection = ifelse(Surface_Water_Use_Ac_Ft > 0, "Yes", "No"))
+
 # Recycled_Water_Connection
 # Recycled_Water_Use_Ac-Ft 
 Surface_Water_Connection
@@ -210,7 +231,7 @@ pson <- pson %>%
     # summation columns
     Total_Crop_Area_prelim_Ac = rowSums(across(ends_with("Area_Ac")), na.rm = TRUE),
     Total_Crop_Area_Ac        = NA, 
-    `Water_Use_Ag_Rate_Ac_Ft` = rowSums(across(ends_with("_rate")), na.rm = TRUE)
+    Water_Use_Ag_Rate_Ac_Ft   = rowSums(across(ends_with("_rate")), na.rm = TRUE)
   ) %>% 
   # remove intermediate vars 
   select(-all_of(c("crop_class", "crop_acres", "applied_af_acre", "applied_af")))
