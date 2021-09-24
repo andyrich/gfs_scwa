@@ -89,21 +89,21 @@ pson <- pson %>%
 
 # water sources -----------------------------------------------------------
 
-Recycled_Water_Connection
-Recycled_Water_Use_Ac-Ft 
-Surface_Water_Connection 
-Surface_Water_Use_Ac-Ft 
-Active_Well 
-Shared_Well 
-Shared_Well_APN 
-Well_Records_Available 
-Onsite_Well 
-Urban_well 
-CA_DrinkingWater_SvcArea_Name 
-CA_DrinkingWater_SvcArea_Within 
-Public_Wat_Connection_Modified 
-Public_Wat_Connection 
-Water_Source_Comment 
+# Recycled_Water_Connection
+# Recycled_Water_Use_Ac-Ft 
+Surface_Water_Connection
+Surface_Water_Use_Ac-Ft
+# Active_Well 
+# Shared_Well 
+# Shared_Well_APN 
+# Well_Records_Available 
+# Onsite_Well 
+# Urban_well 
+# CA_DrinkingWater_SvcArea_Name 
+# CA_DrinkingWater_SvcArea_Within 
+# Public_Wat_Connection_Modified 
+# Public_Wat_Connection 
+# Water_Source_Comment 
 
 
 
@@ -111,44 +111,44 @@ Water_Source_Comment
 # residential water use ---------------------------------------------------
 
 
-Water_Use_Residential_Rate_Ac-Ft 
-Residential_Confidence 
-Residential_GW_Use_Assessor_Ac-Ft 
-Res_GW_Use_Modified 
-Res_GW_Use_Modified_Ac_Ft 
-Res_GW_Use_Ac-Ft 
-Res_GW_Use_Comment 
+# Water_Use_Residential_Rate_Ac-Ft 
+# Residential_Confidence 
+# Residential_GW_Use_Assessor_Ac-Ft 
+# Res_GW_Use_Modified 
+# Res_GW_Use_Modified_Ac_Ft 
+# Res_GW_Use_Ac-Ft 
+# Res_GW_Use_Comment 
 
 
 
 # commercial water use ----------------------------------------------------
 
-Water_Use_Commercial_Rate_Ac-Ft 
-Commercial_Confidence 
-Commercial_GW_Use_Assessor_Ac-Ft 
-Commercial_GW_Use_Modified 
-Commercial_GW_Use_Modified_Ac-Ft 
-Commercial_GW_Use_Ac-Ft 
-Commercial_GW_Use_Comment     
+# Water_Use_Commercial_Rate_Ac-Ft 
+# Commercial_Confidence 
+# Commercial_GW_Use_Assessor_Ac-Ft 
+# Commercial_GW_Use_Modified 
+# Commercial_GW_Use_Modified_Ac-Ft 
+# Commercial_GW_Use_Ac-Ft 
+# Commercial_GW_Use_Comment     
 
     
 
 # commercial or residential irrigation only -------------------------------
 
-Urban_Irrigation_GW_Use_Prelim_Ac-Ft 
-Urban_Irrigation_Modified 
-Urban_Irrigation_Modified_Ac-Ft 
-Urban_Irrigation_GW_Use_Ac-Ft 
-Urban_Irrigation_GW_Use_Comment 
+# Urban_Irrigation_GW_Use_Prelim_Ac-Ft 
+# Urban_Irrigation_Modified 
+# Urban_Irrigation_Modified_Ac-Ft 
+# Urban_Irrigation_GW_Use_Ac-Ft 
+# Urban_Irrigation_GW_Use_Comment 
     
 
 # commercial or residential irrigation only -------------------------------
 
-School_Golf_GW_Use_prelim_Ac-Ft 
-School_Golf_Modified 
-School_Golf_Modified_Ac-Ft 
-School_Golf_GW_Use_Ac-Ft 
-School_Golf_GW_Use_Comment 
+# School_Golf_GW_Use_prelim_Ac-Ft 
+# School_Golf_Modified 
+# School_Golf_Modified_Ac-Ft 
+# School_Golf_GW_Use_Ac-Ft 
+# School_Golf_GW_Use_Comment 
     
 
 # ag water use ------------------------------------------------------------
@@ -174,10 +174,20 @@ crop <- path(data_path, "general/crops/i15_Crop_Mapping_2018.shp") %>%
 crops_per_apn <- st_intersection(select(pson, APN), crop) %>% 
   mutate(crop_acres = as.numeric(units::set_units(st_area(geometry), "acres")))
 
-# join back to pson in the specified format
+# applied water (in acre feet per acre) per crop from the Raftellis report
+# crop class "X" (other) does not have a value in the report, so assume 0.6
+crop_applied_water <- tibble(crop_class = c("C", "D", "T", "V", "G", "P", "X"),
+                             applied_af_acre = c(1.8, 1.8, 1.8, 0.6, 0.3, 0.04, 0.6))
+
+# add applied water and calcualte acre feet used per parcel
+crops_per_apn <- left_join(crops_per_apn, crop_applied_water) %>% 
+  mutate(applied_af = crop_acres * applied_af_acre)
+
+# join crops to parcels in the specified format and calculate consumptive rate
 pson <- pson %>% 
   left_join(st_drop_geometry(crops_per_apn)) %>% 
   mutate(
+    # crop area per parcel
     Grain_Area_Ac                    = ifelse(crop_class == "G", crop_acres, 0),
     Vine_Area_Ac                     = ifelse(crop_class == "V", crop_acres, 0),
     Truck_and_Berry_Crops_Area_Ac    = ifelse(crop_class == "T", crop_acres, 0),
@@ -185,48 +195,54 @@ pson <- pson %>%
     Citrus_and_Subtropical_Area_Ac   = ifelse(crop_class == "C", crop_acres, 0), 
     Cannabis_Outdoor_Area_Ac         = 0, # no cannabis
     Cannabis_Indoor_Area_Ac          = 0, # no cannabis
-    Pasture_Area_Ac                  = ifelse(crop_class == "P", crop_acres, 0)
+    Pasture_Area_Ac                  = ifelse(crop_class == "P", crop_acres, 0),
+    
+    # crop consumptive use (AF/year)
+    Grain_rate                       = ifelse(crop_class == "G", applied_af, 0),
+    Vine_rate                        = ifelse(crop_class == "V", applied_af, 0),
+    Truck_and_Berry_Crops_rate       = ifelse(crop_class == "T", applied_af, 0),
+    Deciduous_Fruit_and_Nuts_rate    = ifelse(crop_class == "D", applied_af, 0),
+    Citrus_and_Subtropical_rate      = ifelse(crop_class == "C", applied_af, 0),
+    Cannabis_Outdoor_rate            = 0, # no cannabis
+    Cannabis_Indoor_rate             = 0, # no cannabis
+    Pasture_rate                     = ifelse(crop_class == "P", applied_af, 0),
+    
+    # summation columns
+    Total_Crop_Area_prelim_Ac = rowSums(across(ends_with("Area_Ac")), na.rm = TRUE),
+    Total_Crop_Area_Ac        = NA, 
+    `Water_Use_Ag_Rate_Ac_Ft` = rowSums(across(ends_with("_rate")), na.rm = TRUE)
   ) %>% 
-  # remove intermediate vars
-  select(-all_of(crop_class, crop_acres))
+  # remove intermediate vars 
+  select(-all_of(c("crop_class", "crop_acres", "applied_af_acre", "applied_af")))
 
- 
- 
 
+# calculate ag water use from other columns
+# pson %>% 
+#   mutate(
+#     # Ag use - surface use + recycled water (all negative values set to 0)
+#     Ag_GW_Use_GIS_Ac_Ft      = NA,
+#     Ag_GW_Use_Modified       = NA,
+#     Ag_GW_Use_Modified_Ac_Ft = NA,
+#     Ag_GW_Use_Ac_Ft          = NA,
+#     Ag_GW_Use_Comment        = NA
+#   )
  
-Grain_rate 
-Vine_rate 
-Truck_and_Berry_Crops_rate 
-Deciduous_Fruit_and_Nuts_rate 
-Citrus_and_Subtropical_rate 
-Cannabis_Outdoor_rate 
-Cannabis_Indoor_rate 
-Pasture_rate 
-Total_Crop_Area_prelim_Ac 
-Total_Crop_Area_Ac 
-Water_Use_Ag_Rate_Ac-Ft 
-Ag_GW_Use_GIS_Ac-Ft 
-Ag_GW_Use_Modified 
-Ag_GW_Use_Modified_Ac_Ft 
-Ag_GW_Use_Ac-Ft 
-Ag_GW_Use_Comment 
-    
 
 
 # determination for GIS survey --------------------------------------------
 
-Residential_Water_Use_Determination 
-Commercial_Water_Use_Determination 
-Urban_Landscape_Irrigation_Water_Use_Determination 
-Ag_Irrigation_Water_Use_Determination 
-Recycled_Water_Use_Determination 
-Surface_Water_Use_Determination 
-School_GolfCourse_Water_Use_Determination 
+# Residential_Water_Use_Determination 
+# Commercial_Water_Use_Determination 
+# Urban_Landscape_Irrigation_Water_Use_Determination 
+# Ag_Irrigation_Water_Use_Determination 
+# Recycled_Water_Use_Determination 
+# Surface_Water_Use_Determination 
+# School_GolfCourse_Water_Use_Determination 
 
     
     
 # determination for GIS survey --------------------------------------------
 
-Total_Groundwater_Use_Ac-Ft 
-Jurisdiction 
-Situs_Address 
+# Total_Groundwater_Use_Ac-Ft 
+# Jurisdiction 
+# Situs_Address 
