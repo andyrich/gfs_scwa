@@ -4,6 +4,10 @@ library(tidyverse)
 library(sf)
 library(here)
 library(fs)
+library(tidylog)
+
+# epsg to use in this study
+epsg = 3310
 
 
 # load data ---------------------------------------------------------------
@@ -58,7 +62,7 @@ pson <- pson %>%
 
 # Does the parcel overlap SRP, Petaluma, or Sonoma Valley basins?
 # we expect SON overlaps only with PET, see map below:
-# mapview::mapview(list(son, pet, srp)) + mapview::mapview(p) 
+# mapview::mapview(list(son, pet, srp)) 
 
 # parcels that intersect multiple basins have duplicate APN across databases
 boundary_parcels <- pson$APN[pson$APN %in% ppet$APN]
@@ -89,6 +93,7 @@ pson <- pson %>%
 
 # water sources -----------------------------------------------------------
 
+## surface water connection -----------------------------------------------
 # read ewrims data, filter to SON, transform, select relevant cols
 ewrims <- dir_ls(path(data_path, "general/ewrims")) %>% 
   read_csv(col_select = c("longitude", "latitude", "face_value_amount", "county"), 
@@ -103,29 +108,95 @@ ewrims <- dir_ls(path(data_path, "general/ewrims")) %>%
   filter(!is.na(latitude), !is.na(longitude),
          !is.nan(latitude), !is.nan(longitude)) %>% 
   st_as_sf(coords = c("longitude", "latitude"), crs = 4269) %>% 
-  st_transform(3310) %>% 
+  st_transform(epsg) %>% 
   select(-county)
 
-# add surface water use (AF/year) to parcels 
-pson <- st_intersection(pson, ewrims) %>% 
-  mutate(Surface_Water_Connection = ifelse(Surface_Water_Use_Ac_Ft > 0, "Yes", "No"))
+# add surface water use (AF/year) to parcels
+pson <- st_join(pson, ewrims) %>% 
+  mutate(Surface_Water_Connection = ifelse(!is.na(Surface_Water_Use_Ac_Ft), "Yes", "No"))
 
-# Recycled_Water_Connection
-# Recycled_Water_Use_Ac-Ft 
-Surface_Water_Connection
-Surface_Water_Use_Ac-Ft
-# Active_Well 
-# Shared_Well 
-# Shared_Well_APN 
-# Well_Records_Available 
-# Onsite_Well 
-# Urban_well 
-# CA_DrinkingWater_SvcArea_Name 
-# CA_DrinkingWater_SvcArea_Within 
-# Public_Wat_Connection_Modified 
-# Public_Wat_Connection 
-# Water_Source_Comment 
 
+## recycled water ---------------------------------------------------------
+# load delivery data from recycled water treatment plants
+
+# recycled water delivered to parcels in 2016 (from billy.dixon@scwa.ca.gov)
+recy <- path(data_path, "son/recycled_water/SVCSD Recycled Water Use APNs.xlsx") %>% 
+  readxl::read_xlsx(sheet = 4) %>% 
+  rename(Recycled_Water_Use_Ac_Ft = af_yr_2016)
+
+# add recycled water parcels to parcel data
+pson <- left_join(pson, recy, by = "APN") %>% 
+  mutate(Recycled_Water_Connection = ifelse(!is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No"))
+
+
+## water service areas ----------------------------------------------------
+
+# water service areas in SON
+wsa <- path(data_path, "general/water_system_boundaries/SABL_Public_083121/SABL_Public_083121.shp") %>% 
+  st_read() %>% 
+  st_transform(epsg) %>% 
+  st_intersection(son) %>% 
+  select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1)
+
+# add water service areas to parcel data
+pson <- st_join(pson, wsa) %>% 
+  mutate(CA_DrinkingWater_SvcArea_Within = 
+           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"),
+         Public_Wat_Connection_Modified = NA,
+         Public_Wat_Connection = 
+           ifelse(CA_DrinkingWater_SvcArea_Within == "Yes", "Yes", "No"), 
+         Water_Source_Comment = NA)
+
+# add connection data from Sonoma City
+socity <- path(data_path, "son/public_water_connection/city_of_sonoma/Sonoma City Water Service Connections within the GSA.xlsx") %>% 
+  readxl::read_xlsx() %>% 
+  select(APN = `APN Dash`) 
+
+# if an explicit connection is present, ensure it is represented
+pson <- pson %>% 
+  mutate(Public_Wat_Connection = 
+           ifelse(APN %in% socity$APN | Public_Wat_Connection == "Yes", "Yes", "No"))
+
+
+
+## wells ------------------------------------------------------------------
+# Sonoma county wells - deduplicate
+scwells <- path(data_path, "general/soco_wells/all_soco_wells_spatial.shp") %>% 
+  st_read() %>% 
+  st_transform(epsg) %>% 
+  st_intersection(son) %>%
+  group_by(Log_No) %>% 
+  slice(1) %>% 
+  ungroup()
+
+# Sonoma count well data - deduplicate
+scwells_data <- path(data_path, "general/soco_wells/all_sonoma_county_wells.xlsx") %>% 
+  readxl::read_xlsx() %>% 
+  select(APN:OtherObservations) %>% 
+  group_by(Log_No) %>% 
+  slice(1) %>% 
+  ungroup()
+
+# combine and retain important cols
+scwells <- left_join(scwells, scwells_data, by = "Log_No") %>% 
+  select(Data_Source) %>% 
+  st_intersection(select(pson, APN)) %>% # wells in parcels
+  # select(Data_Source, APN) %>% # data sources: sweetkind/scwa, oswcr, prmd
+  mutate(well_present = TRUE) # placeholder for logical test below (drop)
+
+# populate database columns
+pson <- pson %>% 
+  left_join(st_drop_geometry(scwells), by = "APN") %>% 
+  mutate(
+    Active_Well = ifelse(!is.na(well_present), "Yes", "No"),
+    Shared_Well = NA, # placeholder for future review
+    Shared_Well_APN = NA, # placeholder for future review
+    Well_Records_Available = ifelse(!is.na(Data_Source), "Yes", "No"),
+    Onsite_Well = 
+      ifelse(Active_Well == "Yes" | Well_Records_Available == "Yes", "Yes", "No"),
+    Urban_well = "No" # placeholder for future review
+  ) %>% 
+  select(-all_of(c("well_present", "Data_Source"))) # drop unnecessary cols
 
 
 
@@ -197,8 +268,9 @@ crops_per_apn <- st_intersection(select(pson, APN), crop) %>%
 
 # applied water (in acre feet per acre) per crop from the Raftellis report
 # crop class "X" (other) does not have a value in the report, so assume 0.6
-crop_applied_water <- tibble(crop_class = c("C", "D", "T", "V", "G", "P", "X"),
-                             applied_af_acre = c(1.8, 1.8, 1.8, 0.6, 0.3, 0.04, 0.6))
+crop_applied_water <- tibble(
+  crop_class = c("C", "D", "T", "V", "G", "P", "X"),
+  applied_af_acre = c(1.8, 1.8, 1.8, 0.6, 0.3, 0.04, 0.6))
 
 # add applied water and calcualte acre feet used per parcel
 crops_per_apn <- left_join(crops_per_apn, crop_applied_water) %>% 
