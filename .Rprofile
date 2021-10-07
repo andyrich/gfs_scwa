@@ -1,6 +1,6 @@
 # reversed, sorted table of a vector
 tsr <- function(x){
-  rev(sort(table(x)))
+  rev(sort(table(x), useNA = "always"))
 }
 
 # source all functions
