@@ -6,9 +6,6 @@ library(here)
 library(fs)
 library(tidylog)
 
-# epsg to use in this study
-epsg = 3310
-
 
 # load data ---------------------------------------------------------------
 
