@@ -6,6 +6,8 @@ library(here)
 library(fs)
 
 
+# TODO: apply the basin boundary code to SRP form Shelly
+
 # load data ---------------------------------------------------------------
 
 # preprocessed spatial parcels from Sonoma Co parcels
