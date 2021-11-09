@@ -15,7 +15,8 @@ ppet <- read_rds(path(data_path, "data_output/pet_parcel.rds"))
 psrp <- read_rds(path(data_path, "data_output/srp_parcel.rds"))
 
 # final fields to use
-fields <- path(data_path, "srp/parcel/Proposed update to Data Dictionary April 2021.xlsx") %>% 
+fields <- path(data_path, 
+               "srp/parcel/Proposed update to Data Dictionary April 2021.xlsx") %>% 
   readxl::read_xlsx(sheet = 3, range = cellranger::cell_cols("C")) %>% 
   set_names("name") %>% 
   filter(!str_detect(name, " ")) %>% 
@@ -32,10 +33,10 @@ srp <- f_load_b118_basin(b118_path, "SANTA ROSA VALLEY - SANTA ROSA PLAIN")
 
 # fields to keep, add, remove ---------------------------------------------
 
-done <- fields[fields %in% colnames(pson)]
-add  <- fields[!fields %in% colnames(pson)]
-rem  <- colnames(pson)[!colnames(pson) %in% fields]
-rem  <- rem[-length(rem)] # keep geometry column
+done <- fields[fields %in% colnames(pson)]  # cols already there
+add  <- fields[!fields %in% colnames(pson)] # cols to add
+rem  <- colnames(pson)[!colnames(pson) %in% fields] # cols to remove
+rem  <- rem[-length(rem)] # don't remove the geometry column
 
 
 # parcel and contact info -------------------------------------------------
@@ -199,21 +200,67 @@ pson <- pson %>%
 
 # residential water use ---------------------------------------------------
 
+# From Raftellis Fee Study: Any residential (or residential and agricultural 
+# use) parcels remaining in areas outside of water service provider systems 
+# are assumed to have or use groundwater from a private well. Available records 
+# of water wells within the Subbasin are incomplete [and not spatially accurate
+# enough] and not used to assess which parcels extract groundwater... used an 
+# estimate of 0.5 AF of water use per year for each developed rural residential 
+# parcel... An additional 0.25 AF were added for any parcels that listed 
+# additional residences on the parcel, up to a maximum of 1 AF per year. 
 
-# Water_Use_Residential_Rate_Ac-Ft 
-# Residential_Confidence 
-# Residential_GW_Use_Assessor_Ac-Ft 
-# Res_GW_Use_Modified 
-# Res_GW_Use_Modified_Ac_Ft 
-# Res_GW_Use_Ac-Ft 
-# Res_GW_Use_Comment 
+# The Urban Residential Groundwater user class represents residential properties
+# in areas served by water service providers that also have a well on the 
+# property... Raftelis and Staff assumed that these wells would primarily be 
+# used for irrigation purposes... it is assumed that Urban Residential Groundwater 
+# Users extract on average 0.1 AF per parcel per year for irrigation purposes.
 
+res_rate_rural_single <- 0.50 # acre feet/year for 1 building
+res_rate_rural_double <- 0.75 # acre feet/year for 2 buildings
+res_rate_rural_triple <- 1.00 # acre feet/year for >=3 buildings
+
+res_rate_urban <- 0.1 # acre feet/year for urban parcels with a well
+
+res_double <- c("RURAL RES/2 OR MORE RES", "RURAL RES SFD W/GRANNY UNIT")
+res_triple <- c( "SINGLE TRIPLEX 3 UNITS/1 STRUC", "5-10 RES UNITS/2+ STRUCTURES",
+                "5-10 RES UNITS/1 STRUCTURE", "11-20 RES UNIT/2+ STRUCTURES",
+                "11-20 RES UNIT/1 STRUCTURE")
+
+# rural groundwater use
+pson <- pson %>% 
+  mutate(
+    # TODO: difference between water use and groundwater use
+    # TODO: account for accessor use codes (see data sheet)
+    Residential_GW_Use_Assessor_Ac_Ft = 
+      case_when(
+        # urban residential rate assumptions: within water system with onsite well
+        CA_DrinkingWater_SvcArea_Within == "Yes" & Onsite_Well == "Yes" ~ res_rate_urban,
+        # rural residential rate assumptions: outside water system with 1 building
+        CA_DrinkingWater_SvcArea_Within == "No" ~ res_rate_rural_single)
+    ) %>% 
+  mutate(
+    Residential_GW_Use_Assessor_Ac_Ft = 
+      # rural residential rate assumptions: outside water system with 2 buildings
+      ifelse(CA_DrinkingWater_SvcArea_Within == "No" & UseCode_Description %in% res_double,
+             res_rate_rural_double, Residential_GW_Use_Assessor_Ac_Ft),
+      # rural residential rate assumptions: outside water system with 3 or more buildings
+    ifelse(CA_DrinkingWater_SvcArea_Within == "No" & UseCode_Description %in% res_triple,
+           res_rate_rural_triple, Residential_GW_Use_Assessor_Ac_Ft)
+  )
+
+# TODO: Water_Use_Residential_Rate_Ac_Ft = ? Asked Rob P on 2021-11-09
+
+# blank fields to permit revision of the data
+pson <- pson %>% 
+  mutate(Res_GW_Use_Modified       = NA,
+         Res_GW_Use_Modified_Ac_Ft = NA,
+         Res_GW_Use_Ac-Ft          = NA,
+         Res_GW_Use_Comment        = NA)
 
 
 # commercial water use ----------------------------------------------------
 
 # Water_Use_Commercial_Rate_Ac-Ft 
-# Commercial_Confidence 
 # Commercial_GW_Use_Assessor_Ac-Ft 
 # Commercial_GW_Use_Modified 
 # Commercial_GW_Use_Modified_Ac-Ft 
