@@ -22,11 +22,12 @@ fields <- path(data_path, "schema/2021_11_03_schema.xlsx") %>%
   set_names("name") %>% 
   filter(!is.na(name)) %>% 
   pull(name)
+fields <- c(fields, "UseCode") # add use code and drop it later
 
 # GSA spatial data
 b118_path <- path(data_path, "general/b118/i08_B118_v6-1.shp") 
 
-# gsas: petaluma, sonoma valley, santa rosa plain
+# gsa spatial data: petaluma, sonoma valley, santa rosa plain
 son <- f_load_b118_basin(b118_path, "NAPA-SONOMA VALLEY - SONOMA VALLEY")
 pet <- f_load_b118_basin(b118_path, "PETALUMA VALLEY")
 srp <- f_load_b118_basin(b118_path, "SANTA ROSA VALLEY - SANTA ROSA PLAIN")
@@ -40,9 +41,8 @@ add  <- fields[!fields %in% colnames(pson)] # cols to add
 rem  <- colnames(pson)[!colnames(pson) %in% fields] # cols to remove
 rem  <- rem[-length(rem)] # don't remove the geometry column
 
-# empty vector to track added fields
-added <- c()
-f_progress <- function(){cat(round(length(intersect(add, added))/length(add)*100), 
+# function to track progress towards complete database
+f_progress <- function(){cat(round(sum(colnames(pson) %in% add)/length(add)*100), 
                              "% complete.\n")}
 
 # parcel and contact info -------------------------------------------------
@@ -58,12 +58,11 @@ pson <- pson %>%
     MailingAddress2     = MailAdr2,
     MailingAddress3     = MailAdr3,
     MailingAddress4     = MailAdr4)
-cat("Added 8 fields to data:\n   ", paste(add[1:8], collapse = "\n    "))
-added <- c(added, add[1:8])
 f_progress()
 
 # remove fields -----------------------------------------------------------
 
+# remove fields that should not be in the final database
 pson <- pson %>% select(-all_of(rem))
 cat("Removed", length(rem), "fields from parcel database.\n   ",
     paste(rem, collapse = "\n    "))
@@ -103,8 +102,6 @@ pson <- pson %>%
   ) %>% 
   # remove intermediate vars
   select(-area_prop_apn)
-cat("Added 6 fields to data:\n   ", paste(add[9:14], collapse = "\n    "))
-added <- c(added, add[9:14])
 f_progress()
 
 # sanity check
@@ -114,6 +111,10 @@ f_progress()
 
 
 # water sources -----------------------------------------------------------
+
+# there are many sources (inputs) of water to each parcel, and here
+# we account for them based on water input type (e.g., recycled, diversion)
+
 ## recycled water ---------------------------------------------------------
 # load delivery data from recycled water treatment plants
 
@@ -125,8 +126,6 @@ recy <- path(data_path, "son/recycled_water/SVCSD Recycled Water Use APNs.xlsx")
 # add recycled water parcels to parcel data
 pson <- left_join(pson, recy, by = "APN") %>% 
   mutate(Recycled_Water_Connection = ifelse(!is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No"))
-cat("Added 2 fields to data:\n   ", paste(add[15:16], collapse = "\n    "))
-added <- c(added, add[15:16]) # update add vector
 f_progress()
 
 
@@ -150,9 +149,8 @@ ewrims <- dir_ls(path(data_path, "general/ewrims")) %>%
 
 # add surface water use (AF/year) to parcels
 pson <- st_join(pson, ewrims) %>% 
-  mutate(Surface_Water_Connection = ifelse(!is.na(Surface_Water_Use_Ac_Ft), "Yes", "No"))
-cat("Added 2 fields to data:\n   ", paste(add[17:18], collapse = "\n    "))
-added <- c(added, add[17:18]) # update add vector
+  mutate(Surface_Water_Connection = ifelse(!is.na(Surface_Water_Use_Ac_Ft), 
+                                           "Yes", "No"))
 f_progress()
 
 
@@ -193,12 +191,9 @@ pson <- pson %>%
     Well_Records_Available = ifelse(!is.na(Data_Source), "Yes", "No"),
     Onsite_Well = 
       ifelse(Active_Well == "Yes" | Well_Records_Available == "Yes", "Yes", "No"),
-    Urban_well = "No" # placeholder for future review
+    Urban_Well = "No" # placeholder for future review
   ) %>% 
   select(-all_of(c("well_present", "Data_Source"))) # drop unnecessary cols
-
-cat("Added 6 fields to data:\n   ", paste(add[19:24], collapse = "\n    "))
-added <- c(added, add[19:24]) # update add vector
 f_progress()
 
 
@@ -216,8 +211,8 @@ wsa <- path(data_path, "general", "water_system_boundaries",
 pson <- st_join(pson, wsa) %>% 
   mutate(CA_DrinkingWater_SvcArea_Within = 
            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"),
-         Public_Wat_Connection_Modified = NA,
-         Public_Wat_Connection = 
+         Public_Water_Connection_Modified = NA,
+         Public_Water_Connection = 
            ifelse(CA_DrinkingWater_SvcArea_Within == "Yes", "Yes", "No"), 
          Water_Source_Comment = NA)
 
@@ -229,11 +224,26 @@ socity <- path(data_path, "son", "public_water_connection", "city_of_sonoma",
 
 # if an explicit connection is present, ensure it is represented
 pson <- pson %>% 
-  mutate(Public_Wat_Connection = 
-           ifelse(APN %in% socity$APN | Public_Wat_Connection == "Yes", "Yes", "No"))
+  mutate(Public_Water_Connection = 
+           ifelse(APN %in% socity$APN | Public_Water_Connection == "Yes", 
+                  "Yes", "No"))
 
-cat("Added 5 fields to data:\n   ", paste(add[25:29], collapse = "\n    "))
-added <- c(added, add[25:29]) # update add vector
+# ensure public water connection is listed for specified Accessor Use Codes
+accessor_key_path <- path(data_path, "general/water_use_by_accessor_code/Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
+pwc_accessor_key <- readxl::read_xlsx(accessor_key_path, 
+                                      sheet = 3, range = "B2:C27") %>% 
+  janitor::clean_names() %>% 
+  mutate(use_code = str_pad(use_code, 4, "left", "0"))
+
+# if the parcel is within a water service area and the use code is listed, 
+# mark a public water service connection even if not explicitly listed
+pson <- pson %>% 
+  mutate(Public_Water_Connection = ifelse(
+    CA_DrinkingWater_SvcArea_Within == "Yes" & UseCode %in% pwc_accessor_key$use_code,
+    "Yes", Public_Water_Connection
+    )
+  )
+
 f_progress()
 
 
@@ -277,24 +287,24 @@ pson <- pson %>%
   mutate(
     # case 1: urban residential: within water system with onsite well
     Res_GW_Use_Prelim_Ac_Ft = 
-      ifelse(Public_Wat_Connection == "Yes" & 
+      ifelse(Public_Water_Connection == "Yes" & 
                Onsite_Well         == "Yes", 
              res_rate_urban, NA),
     # case 2: rural residential outside water system with 1 building
     Res_GW_Use_Prelim_Ac_Ft = 
-      ifelse(Public_Wat_Connection == "No" & 
+      ifelse(Public_Water_Connection == "No" & 
                UseCode_Description %in% res_double &
                UseCode_Description == "Residential",
              res_rate_rural_single, Res_GW_Use_Prelim_Ac_Ft),
     # case 3: rural residential outside water system with 2 buildings
     Res_GW_Use_Prelim_Ac_Ft = 
-      ifelse(Public_Wat_Connection == "No" & 
+      ifelse(Public_Water_Connection == "No" & 
                UseCode_Description %in% res_double &
                UseCode_Description == "Residential",
              res_rate_rural_double, Res_GW_Use_Prelim_Ac_Ft),
     # case 4: rural residential outside water system with 3 buildings
     Res_GW_Use_Prelim_Ac_Ft = 
-      ifelse(Public_Wat_Connection == "No" & 
+      ifelse(Public_Water_Connection == "No" & 
                UseCode_Description %in% res_triple &
                UseCode_Description == "Residential",
              res_rate_rural_triple, Res_GW_Use_Prelim_Ac_Ft)
@@ -310,20 +320,34 @@ pson <- pson %>%
                                    Res_GW_Use_Prelim_Ac_Ft))
 
 
-# TODO: Res_W_Use_Assessor_Ac_Ft = ? Asked Rob P on 2021-11-09
-# I think we don't need to find this because we use the UseCodes already
-# to find the GW use from Raftellis' previous work. 
+# Res_W_Use_Assessor_Ac_Ft = Water use rate based off assessor use code
+# Dependency provided by Rob P on 2021-11-16
+res_use_accessor_key <- readxl::read_xlsx(accessor_key_path, 
+                                          sheet = 2) %>% 
+  janitor::clean_names() %>% 
+  mutate(UseCode = str_pad(land_use_code, 4, "left", "0")) %>% 
+  select(UseCode, 
+         Res_W_Use_Assessor_Ac_Ft = residential_use, 
+         Commercial_W_Use_Assessor_Ac_Ft = commercial_industrial_misc_use)
 
-cat("Added 5 fields to data:\n   ", paste(add[31:35], collapse = "\n    "))
-added <- c(added, add[31:35]) # update add vector
+# add Residential and Commercial Water Use based on Accessor Code
+pson <- left_join(pson, res_use_accessor_key) %>% 
+  # NA values overwritten with 0
+  mutate(
+    Res_W_Use_Assessor_Ac_Ft = ifelse(
+      is.na(Res_W_Use_Assessor_Ac_Ft), 0, Res_W_Use_Assessor_Ac_Ft),
+    Commercial_W_Use_Assessor_Ac_Ft = ifelse(
+      is.na(Commercial_W_Use_Assessor_Ac_Ft), 0, Commercial_W_Use_Assessor_Ac_Ft)
+  )
+
 f_progress()
+
 
 # commercial water use ----------------------------------------------------
 
-# TODO: Commercial_W_Use_Assessor_Ac_Ft 
 
 # TODO: Commercial_GW_Use_Prelim_Ac_Ft
-
+pson <- pson %>% mutate(Commercial_GW_Use_Prelim_Ac_Ft = NA)
 
 # blank fields to permit revision of the data
 pson <- pson %>% 
@@ -333,6 +357,8 @@ pson <- pson %>%
          Commercial_GW_Use_Ac_Ft = ifelse(Commercial_GW_Use_Modified == "Yes", 
                                           Commercial_GW_Use_Modified_Ac_Ft, 
                                           Commercial_GW_Use_Prelim_Ac_Ft))
+
+f_progress()
 
 
 # urban irrigation --------------------------------------------------------
@@ -345,19 +371,18 @@ pson <- pson %>%
 pson <- pson %>% 
   mutate(
     Urban_Irrigation_GW_Use_Prelim_Ac_Ft = ifelse(
-      Urban_well == "Yes" & Public_Wat_Connection == "Yes", 0.1, 0))
+      Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
 
 # blank fields to permit revision of the data
 pson <- pson %>% 
-  mutate(Urban_Irrigation_GW_Use_Modified       = "No",
-         Urban_Irrigation_GW_Use_Modified_Ac_Ft = NA,
+  mutate(Urban_Irrigation_Modified              = "No",
+         Urban_Irrigation_Modified_Ac_Ft        = NA,
          Urban_Irrigation_GW_Use_Comment        = NA,
-         Urban_Irrigation_GW_Use_Ac_Ft = ifelse(Urban_Irrigation_GW_Use_Modified == "Yes", 
-                                                Urban_Irrigation_GW_Use_Modified_Ac_Ft, 
-                                                Urban_Irrigation_GW_Use_Prelim_Ac_Ft))
+         Urban_Irrigation_GW_Use_Ac_Ft = ifelse(
+           Urban_Irrigation_Modified == "Yes", 
+           Urban_Irrigation_GW_Use_Modified_Ac_Ft, 
+           Urban_Irrigation_GW_Use_Prelim_Ac_Ft))
 
-cat("Added 5 fields to data:\n   ", paste(add[42:46], collapse = "\n    "))
-added <- c(added, add[42:46]) # update add vector
 f_progress()
     
 
@@ -368,12 +393,14 @@ f_progress()
 # http://watermanagement.ucdavis.edu/research/application-efficiency/
 et <- 3.9 # feet, from avg annual ET0 at nearby CIMIS stations 77 and 109
 aw <- et / (1 - 0.65) # feet
-school_codes <- filter(pson, str_detect(UseCode_Description, "SCHOOL")) %>% mapview()
+
+# school locations
+# school_codes <- filter(pson, str_detect(UseCode_Description, "SCHOOL")) %>% mapview()
 
 # School_Golf_GW_Use_prelim_Ac_Ft 
 pson <- pson %>% 
-  mutate(School_Golf_GW_Use_prelim_Ac_Ft = 
-           ifelse(str_detect(UseCode_Description, "SCHOOL"),
+  mutate(School_Golf_GW_Use_Prelim_Ac_Ft = 
+           ifelse(str_detect(UseCode_Description, "SCHOOL|GOLF"),
                   aw/LandSizeAcres, 0)) 
 
 # sanity check: SRP estimate was 200 AF/yr, and we calculate 201 here. passes.
@@ -383,15 +410,13 @@ pson <- pson %>%
   
 # blank fields to permit revision of the data
 pson <- pson %>% 
-  mutate(School_Golf_GW_Use_Modified       = "No",
-         School_Golf_GW_Use_Modified_Ac_Ft = NA,
-         School_Golf_GW_Use_Comment        = NA,
-         School_Golf_GW_Use_Ac_Ft = ifelse(School_Golf_GW_Use_Modified == "Yes", 
+  mutate(School_Golf_Modified       = "No",
+         School_Golf_Modified_Ac_Ft = NA,
+         School_Golf_GW_Use_Comment = NA,
+         School_Golf_GW_Use_Ac_Ft = ifelse(School_Golf_Modified == "Yes", 
                                            School_Golf_GW_Use_Modified_Ac_Ft, 
                                            School_Golf_GW_Use_Prelim_Ac_Ft)) 
 
-cat("Added 5 fields to data:\n   ", paste(add[47:51], collapse = "\n    "))
-added <- c(added, add[47:51]) # update add vector
 f_progress()
 
 
@@ -443,19 +468,19 @@ pson <- pson %>%
     Pasture_Area_Ac                  = ifelse(crop_class == "P", crop_acres, 0),
     
     # crop consumptive use (AF/year)
-    Grain_rate                       = ifelse(crop_class == "G", applied_af, 0),
-    Vine_rate                        = ifelse(crop_class == "V", applied_af, 0),
-    Truck_and_Berry_Crops_rate       = ifelse(crop_class == "T", applied_af, 0),
-    Deciduous_Fruit_and_Nuts_rate    = ifelse(crop_class == "D", applied_af, 0),
-    Citrus_and_Subtropical_rate      = ifelse(crop_class == "C", applied_af, 0),
-    Cannabis_Outdoor_rate            = 0, # no cannabis
-    Cannabis_Indoor_rate             = 0, # no cannabis
-    Pasture_rate                     = ifelse(crop_class == "P", applied_af, 0),
+    Grain_Rate                       = ifelse(crop_class == "G", applied_af, 0),
+    Vine_Rate                        = ifelse(crop_class == "V", applied_af, 0),
+    Truck_and_Berry_Crops_Rate       = ifelse(crop_class == "T", applied_af, 0),
+    Deciduous_Fruit_and_Nuts_Rate    = ifelse(crop_class == "D", applied_af, 0),
+    Citrus_and_Subtropical_Rate      = ifelse(crop_class == "C", applied_af, 0),
+    Cannabis_Outdoor_Rate            = 0, # no cannabis
+    Cannabis_Indoor_Rate             = 0, # no cannabis
+    Pasture_Rate                     = ifelse(crop_class == "P", applied_af, 0),
     
     # summation columns
-    Total_Crop_Area_prelim_Ac = rowSums(across(ends_with("Area_Ac")), na.rm = TRUE),
+    Total_Crop_Area_Prelim_Ac = rowSums(across(ends_with("Area_Ac")), na.rm = TRUE),
     Total_Crop_Area_Ac        = NA, 
-    Water_Use_Ag_Rate_Ac_Ft   = rowSums(across(ends_with("_rate")), na.rm = TRUE)
+    Water_Use_Ag_Rate_Ac_Ft   = rowSums(across(ends_with("_Rate")), na.rm = TRUE)
   ) %>% 
   # remove intermediate vars 
   select(-all_of(c("crop_class", "crop_acres", "applied_af_acre", "applied_af")))
@@ -493,10 +518,8 @@ pson <- pson %>%
          Ag_GW_Use_Comment        = NA,
          Ag_GW_Use_Ac_Ft = ifelse(Ag_GW_Use_Modified == "Yes", 
                                   Ag_GW_Use_Modified_Ac_Ft, 
-                                  Ag_GW_Use_Prelim_Ac_Ft)) 
+                                  Ag_GW_Use_GIS_Ac_Ft)) 
 
-cat("Added 20 fields to data:\n   ", paste(add[52:71], collapse = "\n    "))
-added <- c(added, add[52:76]) # update add vector
 f_progress()
 
 
@@ -508,15 +531,33 @@ f_progress()
 
 # determination for GIS survey --------------------------------------------
 
-# Residential_Water_Use_Determination 
-# Commercial_Water_Use_Determination 
-# Urban_Landscape_Irrigation_Water_Use_Determination 
-# Ag_Irrigation_Water_Use_Determination 
-# Recycled_Water_Use_Determination 
-# Surface_Water_Use_Determination 
-# School_GolfCourse_Water_Use_Determination 
+pson <- pson %>% 
+  mutate(
+    Residential_Water_Use_Determination = ifelse(
+      Water_Use_Residential_Rate_Ac_Ft > 0, "Yes", "No"
+    ),
+    Commercial_Water_Use_Determination = ifelse(
+      Water_Use_Commercial_Rate_Ac_Ft > 0, "Yes", "No"
+    ),
+    Urban_Landscape_Irrigation_Water_Use_Determination = ifelse(
+      Urban_Irrigation_GW_Use_Ac_Ft > 0, "Yes", "No"
+    ),
+    Ag_Irrigation_Water_Use_Determination = ifelse(
+      Water_Use_Ag_Rate_Ac_Ft  > 0, "Yes", "No"
+    ),
+    Recycled_Water_Use_Determination = ifelse(
+      Recycled_Water_Use_Ac_Ft > 0, "Yes", "No"
+    ),
+    Surface_Water_Use_Determination = ifelse(
+      Surface_Water_Use_Ac_Ft > 0, "Yes", "No"
+    ),
+    School_GolfCourse_Water_Use_Determination = ifelse(
+      School_Golf_GW_Use_Ac_Ft > 0, "Yes", "No"
+    )
+  )
+  
+f_progress()
 
-    
     
 # determination for GIS survey --------------------------------------------
 
@@ -525,5 +566,14 @@ f_progress()
 # Situs_Address 
 
 
+
+
+# final manual tests ------------------------------------------------------
+
+# drop no longer needed UseCode column
+pson <- select(pson, -UseCode)
+
 # sanity check: cols that still need to be added
-add[!add %in% added]
+add[!add %in% colnames(pson)]
+
+f_progress()
