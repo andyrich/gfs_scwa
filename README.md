@@ -26,7 +26,14 @@ The `EPSG` is the projection used in this study that all spatial data are standa
 Restart `R` for changes to take effect.  
 
 
+## Schema
+
+Data schema that the database builds towards was defined by Permit Sonoma and is stored at `data_path/schema/2021_11_03_schema.xlsx`.  
+
+For methods, see `docs/memo.docx`.
+
+
 
 ***
 
-Last updated by *Rich Pauloo* on 2021-08-03.  
+Last updated by *Rich Pauloo* on 2021-12-15.  
