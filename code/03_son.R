@@ -45,6 +45,14 @@ rem  <- rem[-length(rem)] # don't remove the geometry column
 f_progress <- function(){cat(round(sum(colnames(pson) %in% add)/length(add)*100), 
                              "% complete.\n")}
 
+# function to ensure no duplicates are returned during spatial joins and joins
+f_verify_non_duplicates <- function(){
+  print(nrow(pson))
+  print(nrow(distinct(pson)))
+  print(length(unique(pson$APN)))
+}
+
+
 # parcel and contact info -------------------------------------------------
 
 pson <- pson %>% 
@@ -59,6 +67,7 @@ pson <- pson %>%
     MailingAddress3     = MailAdr3,
     MailingAddress4     = MailAdr4)
 f_progress()
+
 
 # remove fields -----------------------------------------------------------
 
@@ -147,11 +156,19 @@ ewrims <- dir_ls(path(data_path, "general/ewrims")) %>%
   st_transform(epsg) %>% 
   select(-county)
 
-# add surface water use (AF/year) to parcels
-pson <- st_join(pson, ewrims) %>% 
+# add surface water use (AF/year) to parcels, but be careful, as some 
+# parcels have MULTIPLE ewrims points and these must be summarized
+ewrims_key <- st_join(select(pson, APN), ewrims) %>% 
+  st_drop_geometry() %>% 
+  group_by(APN) %>% 
+  summarise(Surface_Water_Use_Ac_Ft = sum(Surface_Water_Use_Ac_Ft, na.rm = TRUE)) %>% 
+  ungroup()
+
+pson <- left_join(pson, ewrims_key) %>% 
   mutate(Surface_Water_Connection = ifelse(!is.na(Surface_Water_Use_Ac_Ft), 
                                            "Yes", "No"))
 f_progress()
+f_verify_non_duplicates()
 
 
 ## wells ------------------------------------------------------------------
@@ -174,27 +191,27 @@ scwells_data <- path(data_path, "general",
   slice(1) %>% 
   ungroup()
 
-# combine and retain important cols
-scwells <- left_join(scwells, scwells_data, by = "Log_No") %>% 
-  select(Data_Source) %>% 
-  st_intersection(select(pson, APN)) %>% # wells in parcels
-  # select(Data_Source, APN) %>% # data sources: sweetkind/scwa, oswcr, prmd
-  mutate(well_present = TRUE) # placeholder for logical test below (drop)
+# combine and return vector of APNs with a well present
+scwells_apn <- left_join(scwells, scwells_data, by = "Log_No") %>% 
+  # There is a lot of WCR data we're dropping, but it's all there!
+  select(Log_No) %>% 
+  st_intersection(select(pson, APN)) %>% 
+  pull(APN) %>% 
+  unique()
 
 # populate database columns
 pson <- pson %>% 
-  left_join(st_drop_geometry(scwells), by = "APN") %>% 
   mutate(
-    Active_Well = ifelse(!is.na(well_present), "Yes", "No"),
+    Active_Well = ifelse(APN %in% scwells_apn, "Yes", "No"),
     Shared_Well = NA, # placeholder for future review
     Shared_Well_APN = NA, # placeholder for future review
-    Well_Records_Available = ifelse(!is.na(Data_Source), "Yes", "No"),
+    Well_Records_Available = ifelse(APN %in% scwells_apn, "Yes", "No"),
     Onsite_Well = 
       ifelse(Active_Well == "Yes" | Well_Records_Available == "Yes", "Yes", "No"),
     Urban_Well = "No" # placeholder for future review
-  ) %>% 
-  select(-all_of(c("well_present", "Data_Source"))) # drop unnecessary cols
+  ) 
 f_progress()
+f_verify_non_duplicates()
 
 
 ## water service areas ----------------------------------------------------
@@ -207,14 +224,28 @@ wsa <- path(data_path, "general", "water_system_boundaries",
   st_intersection(son) %>% 
   select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1)
 
-# add water service areas to parcel data
-pson <- st_join(pson, wsa) %>% 
+# add water service areas to parcel data, first need to summarize data
+# to avoid duplicates where a parcel falls within more than one water system!
+wsa_key <- st_join(pson, wsa) %>% 
+  select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
+  group_by(APN) %>% 
+  # for parcels with > 1 water system, combine water system names
+  mutate(CA_DrinkingWater_SvcArea_Name = paste(
+    CA_DrinkingWater_SvcArea_Name, collapse = "; ")) %>%
+  ungroup() %>% 
+  distinct() %>% 
+  st_drop_geometry() %>% 
+  select(APN, CA_DrinkingWater_SvcArea_Name)
+
+pson <- left_join(pson, wsa_key) %>% 
   mutate(CA_DrinkingWater_SvcArea_Within = 
            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"),
          Public_Water_Connection_Modified = NA,
          Public_Water_Connection = 
            ifelse(CA_DrinkingWater_SvcArea_Within == "Yes", "Yes", "No"), 
          Water_Source_Comment = NA)
+
+f_verify_non_duplicates()
 
 # add explicit connection data from Sonoma City
 socity <- path(data_path, "son", "public_water_connection", "city_of_sonoma", 
@@ -245,6 +276,7 @@ pson <- pson %>%
   )
 
 f_progress()
+f_verify_non_duplicates()
 
 
 # residential water use ---------------------------------------------------
@@ -341,6 +373,7 @@ pson <- left_join(pson, res_use_accessor_key) %>%
   )
 
 f_progress()
+f_verify_non_duplicates()
 
 
 # commercial water use ----------------------------------------------------
@@ -359,6 +392,7 @@ pson <- pson %>%
                                           Commercial_GW_Use_Prelim_Ac_Ft))
 
 f_progress()
+f_verify_non_duplicates()
 
 
 # urban irrigation --------------------------------------------------------
@@ -384,7 +418,8 @@ pson <- pson %>%
            Urban_Irrigation_GW_Use_Prelim_Ac_Ft))
 
 f_progress()
-    
+f_verify_non_duplicates()
+
 
 # schools and golf courses ------------------------------------------------
 
@@ -418,6 +453,7 @@ pson <- pson %>%
                                            School_Golf_GW_Use_Prelim_Ac_Ft)) 
 
 f_progress()
+f_verify_non_duplicates()
 
 
 # crop water use ----------------------------------------------------------
@@ -437,53 +473,79 @@ crop <- path(data_path, "general/crops/i15_Crop_Mapping_2018.shp") %>%
   st_transform(epsg) %>% 
   st_make_valid() %>% 
   st_intersection(son) %>% 
-  select(crop_class = CLASS2)
+  select(crop_class = CLASS2) %>% 
+  mutate(crop_class = case_when(
+    crop_class == "C" ~ "Citrus_and_Subtropical",
+    crop_class == "D" ~ "Deciduous_Fruit_and_Nuts",
+    crop_class == "T" ~ "Truck_and_Berry_Crops",
+    crop_class == "V" ~ "Vine",
+    crop_class == "G" ~ "Grain",
+    crop_class == "P" ~ "Pasture",
+    TRUE ~ "X"
+  ))
 
-# get crops per APN and recalculate area
+# get crops per APN and recalculate area, and as before, because there many
+# APN with > 1 crop, we need to make summarize the data before joining!
 crops_per_apn <- st_intersection(select(pson, APN), crop) %>% 
-  mutate(crop_acres = as.numeric(units::set_units(st_area(geometry), "acres")))
+  mutate(crop_acres = as.numeric(units::set_units(st_area(geometry), "acres"))) %>% 
+  # very important! Duplicates are present, and de-duplication is needed
+  distinct() %>% 
+  st_drop_geometry() %>% 
+  # also incredibly important: there are multiple crop polygons per APN 
+  # that need to be summed!
+  group_by(APN, crop_class) %>% 
+  summarise(crop_acres = sum(crop_acres, na.rm = TRUE)) %>% 
+  ungroup()
 
 # applied water (in acre feet per acre) per crop from the Raftellis report
 # crop class "X" (other) does not have a value in the report, so assume 0.6
 crop_applied_water <- tibble(
-  crop_class = c("C", "D", "T", "V", "G", "P", "X"),
+  crop_class = c("Citrus_and_Subtropical", "Deciduous_Fruit_and_Nuts", 
+                 "Truck_and_Berry_Crops", "Vine", "Grain", "Pasture", "X"),
   applied_af_acre = c(1.8, 1.8, 1.8, 0.6, 0.3, 0.04, 0.6))
 
-# add applied water and calcualte acre feet used per parcel
-crops_per_apn <- left_join(crops_per_apn, crop_applied_water) %>% 
-  mutate(applied_af = crop_acres * applied_af_acre)
+# add applied water and calculate acre feet used per parcel, but because there
+# are multiple crops per field, we need to make sure the output dataframe has
+# only one row per APN, and is in wide format ready for the join to `pson`
+crops_per_apn_key <- left_join(crops_per_apn, crop_applied_water) %>% 
+  mutate(applied_af = crop_acres * applied_af_acre) %>% 
+  select(-applied_af_acre) %>% 
+  pivot_wider(names_from = crop_class, values_from = c(crop_acres, applied_af))
+
+# fix names
+cns <- names(crops_per_apn_key)
+cns[str_which(cns, "crop_acres")] <- paste0(
+  str_replace_all(
+    cns[str_which(cns, "crop_acres")], "crop_acres_", ""), 
+  "_Area_Ac")
+cns[str_which(cns, "applied_af")] <- paste0(
+  str_replace_all(
+    cns[str_which(cns, "applied_af")], "applied_af_", ""), 
+  "_Rate")
+names(crops_per_apn_key) <- cns
+
+# NA values for crop water use go to zero
+crops_per_apn_key[is.na(crops_per_apn_key)] <- 0
 
 # join crops to parcels in the specified format and calculate consumptive rate
 pson <- pson %>% 
-  left_join(st_drop_geometry(crops_per_apn)) %>% 
+  left_join(crops_per_apn_key) %>% 
   mutate(
     # crop area per parcel
-    Grain_Area_Ac                    = ifelse(crop_class == "G", crop_acres, 0),
-    Vine_Area_Ac                     = ifelse(crop_class == "V", crop_acres, 0),
-    Truck_and_Berry_Crops_Area_Ac    = ifelse(crop_class == "T", crop_acres, 0),
-    Deciduous_Fruit_and_Nuts_Area_Ac = ifelse(crop_class == "D", crop_acres, 0),
-    Citrus_and_Subtropical_Area_Ac   = ifelse(crop_class == "C", crop_acres, 0), 
     Cannabis_Outdoor_Area_Ac         = 0, # no cannabis
     Cannabis_Indoor_Area_Ac          = 0, # no cannabis
-    Pasture_Area_Ac                  = ifelse(crop_class == "P", crop_acres, 0),
     
     # crop consumptive use (AF/year)
-    Grain_Rate                       = ifelse(crop_class == "G", applied_af, 0),
-    Vine_Rate                        = ifelse(crop_class == "V", applied_af, 0),
-    Truck_and_Berry_Crops_Rate       = ifelse(crop_class == "T", applied_af, 0),
-    Deciduous_Fruit_and_Nuts_Rate    = ifelse(crop_class == "D", applied_af, 0),
-    Citrus_and_Subtropical_Rate      = ifelse(crop_class == "C", applied_af, 0),
     Cannabis_Outdoor_Rate            = 0, # no cannabis
     Cannabis_Indoor_Rate             = 0, # no cannabis
-    Pasture_Rate                     = ifelse(crop_class == "P", applied_af, 0),
     
     # summation columns
     Total_Crop_Area_Prelim_Ac = rowSums(across(ends_with("Area_Ac")), na.rm = TRUE),
-    Total_Crop_Area_Ac        = NA, 
+    Total_Crop_Area_Ac        = Total_Crop_Area_Prelim_Ac, 
     Water_Use_Ag_Rate_Ac_Ft   = rowSums(across(ends_with("_Rate")), na.rm = TRUE)
-  ) %>% 
-  # remove intermediate vars 
-  select(-all_of(c("crop_class", "crop_acres", "applied_af_acre", "applied_af")))
+  ) 
+
+f_verify_non_duplicates()
 
 # calculate groundwater ag water use
 pson <- pson %>% 
@@ -521,6 +583,7 @@ pson <- pson %>%
                                   Ag_GW_Use_GIS_Ac_Ft)) 
 
 f_progress()
+f_verify_non_duplicates()
 
 
 # calc ag water use -------------------------------------------------------
