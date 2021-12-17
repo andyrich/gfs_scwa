@@ -543,7 +543,10 @@ pson <- pson %>%
     Total_Crop_Area_Prelim_Ac = rowSums(across(ends_with("Area_Ac")), na.rm = TRUE),
     Total_Crop_Area_Ac        = Total_Crop_Area_Prelim_Ac, 
     Water_Use_Ag_Rate_Ac_Ft   = rowSums(across(ends_with("_Rate")), na.rm = TRUE)
-  ) 
+  ) %>% 
+  # replace NA areas and rates with 0
+  mutate(across(ends_with("_Area_Ac"), ~ifelse(is.na(.x), 0, .x)),
+         across(ends_with("_Rate"), ~ifelse(is.na(.x), 0, .x)))
 
 f_verify_non_duplicates()
 
@@ -597,10 +600,14 @@ f_verify_non_duplicates()
 pson <- pson %>% 
   mutate(
     Residential_Water_Use_Determination = ifelse(
-      Water_Use_Residential_Rate_Ac_Ft > 0, "Yes", "No"
+      Res_W_Use_Assessor_Ac_Ft > 0 | 
+        Res_GW_Use_Prelim_Ac_Ft > 0 | 
+        Res_GW_Use_Modified_Ac_Ft > 0, "Yes", "No"
     ),
     Commercial_Water_Use_Determination = ifelse(
-      Water_Use_Commercial_Rate_Ac_Ft > 0, "Yes", "No"
+      Commercial_W_Use_Assessor_Ac_Ft > 0 | 
+        Commercial_GW_Use_Prelim_Ac_Ft > 0 | 
+        Commercial_GW_Use_Modified_Ac_Ft > 0, "Yes", "No"
     ),
     Urban_Landscape_Irrigation_Water_Use_Determination = ifelse(
       Urban_Irrigation_GW_Use_Ac_Ft > 0, "Yes", "No"
@@ -617,9 +624,12 @@ pson <- pson %>%
     School_GolfCourse_Water_Use_Determination = ifelse(
       School_Golf_GW_Use_Ac_Ft > 0, "Yes", "No"
     )
-  )
+  ) %>% 
+  # make all NAs in these columns go to zero
+  mutate(across(ends_with("Determination"), ~ifelse(is.na(.x), "No", .x)))
   
 f_progress()
+f_verify_non_duplicates()
 
     
 # determination for GIS survey --------------------------------------------
@@ -640,3 +650,4 @@ pson <- select(pson, -UseCode)
 add[!add %in% colnames(pson)]
 
 f_progress()
+f_verify_non_duplicates()
