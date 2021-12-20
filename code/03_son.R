@@ -177,35 +177,44 @@ scwells <- path(data_path, "general",
                 "soco_wells/all_soco_wells_spatial.shp") %>% 
   st_read() %>% 
   st_transform(epsg) %>% 
-  st_intersection(son) %>%
-  group_by(Log_No) %>% 
+  st_intersection(select(pson, APN)) %>%
+  add_count(APN, name = "Well_Count") %>% 
+  group_by(APN) %>% 
+  mutate(Well_Log_Nos = paste(Log_No, collapse = "; ")) %>% 
   slice(1) %>% 
-  ungroup()
+  ungroup() %>% 
+  select(APN, Well_Count, Well_Log_Nos) %>% 
+  st_drop_geometry()
 
+# DEPRICATED: just know that more detailed well data is here
 # Sonoma count well data - deduplicate
-scwells_data <- path(data_path, "general", 
-                     "soco_wells/all_sonoma_county_wells.xlsx") %>% 
-  readxl::read_xlsx() %>% 
-  select(APN:OtherObservations) %>% 
-  group_by(Log_No) %>% 
-  slice(1) %>% 
-  ungroup()
+# scwells_data <- path(data_path, "general", 
+#                      "soco_wells/all_sonoma_county_wells.xlsx") %>% 
+#   readxl::read_xlsx() %>% 
+#   select(APN:OtherObservations) %>% 
+#   group_by(Log_No) %>% 
+#   slice(1) %>% 
+#   ungroup()
 
+# DEPRICATED: simplified by joining spatial well data to pson above
 # combine and return vector of APNs with a well present
-scwells_apn <- left_join(scwells, scwells_data, by = "Log_No") %>% 
-  # There is a lot of WCR data we're dropping, but it's all there!
-  select(Log_No) %>% 
-  st_intersection(select(pson, APN)) %>% 
-  pull(APN) %>% 
-  unique()
+# scwells_apn <- left_join(scwells, scwells_data, by = "Log_No") %>% 
+#   # There is a lot of WCR data we're dropping, but it's all there!
+#   select(Log_No) %>% 
+#   st_intersection(select(pson, APN)) %>% 
+#   pull(APN) %>% 
+#   unique()
 
 # populate database columns
 pson <- pson %>% 
+  left_join(scwells) %>% 
   mutate(
-    Active_Well = ifelse(APN %in% scwells_apn, "Yes", "No"),
+    # no well count means 0 onsite wells
+    Well_Count = ifelse(is.na(Well_Count), 0, Well_Count),
+    Active_Well = ifelse(Well_Count > 0, "Yes", "No"),
     Shared_Well = NA, # placeholder for future review
     Shared_Well_APN = NA, # placeholder for future review
-    Well_Records_Available = ifelse(APN %in% scwells_apn, "Yes", "No"),
+    Well_Records_Available = ifelse(Well_Count > 0, "Yes", "No"),
     Onsite_Well = 
       ifelse(Active_Well == "Yes" | Well_Records_Available == "Yes", "Yes", "No"),
     Urban_Well = "No" # placeholder for future review
@@ -566,6 +575,9 @@ pson <- pson %>%
            Surface_Water_Use_Ac_Ft +
            Recycled_Water_Use_Ac_Ft)
 
+# No Idle Acres to start - this is reported
+pson <- pson %>% mutate(Idle_Ac = 0)
+
 # modifications
 pson <- pson %>%
   mutate(
@@ -587,12 +599,6 @@ pson <- pson %>%
 
 f_progress()
 f_verify_non_duplicates()
-
-
-# calc ag water use -------------------------------------------------------
-
-
- 
 
 
 # determination for GIS survey --------------------------------------------
@@ -632,13 +638,28 @@ f_progress()
 f_verify_non_duplicates()
 
     
-# determination for GIS survey --------------------------------------------
+# total calculations ------------------------------------------------------
 
-# Total_Groundwater_Use_Ac-Ft 
+# ensure NA values go to 0 so the result is calculable
+pson <- pson %>% 
+  mutate(across(ends_with("GW_Use_Ac_Ft"), ~ifelse(is.na(.x), 0, .x))) 
+
+# calculate total groundwater use
+pson <- pson %>% 
+  mutate(
+    Total_Groundwater_Use_Ac_Ft =
+      Res_GW_Use_Ac_Ft + 
+      Commercial_GW_Use_Ac_Ft + 
+      Ag_GW_Use_Ac_Ft + 
+      School_Golf_GW_Use_Ac_Ft + 
+      Urban_Irrigation_GW_Use_Ac_Ft,
+    Total_Groundwater_Use_PublicView = NA
+  )
+
+# additional columns
+
 # Jurisdiction 
 # Situs_Address 
-
-
 
 
 # final manual tests ------------------------------------------------------
