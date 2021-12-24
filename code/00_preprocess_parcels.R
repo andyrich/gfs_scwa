@@ -20,7 +20,7 @@ gsas <- reduce(list(son, pet, srp), st_union) %>% as("Spatial")
 
 # parcels from public sonoma county data portal
 # https://gis-sonomacounty.hub.arcgis.com/pages/data
-parcel <- st_read(path(data_path, "general/parcel/Parcels_Public_Shapefile.shp")) %>% 
+parcel <- st_read(path(data_path, "general/parcel/CDR_PARCEL_PUB_SHP_vw.shp")) %>% 
   st_transform(epsg) %>% 
   st_make_valid() %>% 
   # some acres are wrong: re-calculate at APN level
