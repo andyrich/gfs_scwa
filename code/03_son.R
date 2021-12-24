@@ -7,6 +7,8 @@ library(fs)
 library(tidylog, warn.conflicts = FALSE)
 library(mapview)
 
+# area of interest object to make helper functions work
+aoi = "pson"
 
 # load data ---------------------------------------------------------------
 
@@ -40,17 +42,6 @@ done <- fields[fields %in% colnames(pson)]  # cols already there
 add  <- fields[!fields %in% colnames(pson)] # cols to add
 rem  <- colnames(pson)[!colnames(pson) %in% fields] # cols to remove
 rem  <- rem[-length(rem)] # don't remove the geometry column
-
-# function to track progress towards complete database
-f_progress <- function(){cat(round(sum(colnames(pson) %in% add)/length(add)*100), 
-                             "% complete.\n")}
-
-# function to ensure no duplicates are returned during spatial joins and joins
-f_verify_non_duplicates <- function(){
-  print(nrow(pson))
-  print(nrow(distinct(pson)))
-  print(length(unique(pson$APN)))
-}
 
 
 # parcel and contact info -------------------------------------------------
@@ -128,20 +119,23 @@ f_progress()
 # load delivery data from recycled water treatment plants
 
 # recycled water delivered to parcels in 2016 (from billy.dixon@scwa.ca.gov)
-recy <- path(data_path, "son/recycled_water/SVCSD Recycled Water Use APNs.xlsx") %>% 
+recy <- path(data_path, 
+             "son/recycled_water/SVCSD Recycled Water Use APNs.xlsx") %>% 
   readxl::read_xlsx(sheet = 4) %>% 
   rename(Recycled_Water_Use_Ac_Ft = af_yr_2016)
 
 # add recycled water parcels to parcel data
 pson <- left_join(pson, recy, by = "APN") %>% 
-  mutate(Recycled_Water_Connection = ifelse(!is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No"))
+  mutate(Recycled_Water_Connection = ifelse(
+    !is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No"))
 f_progress()
 
 
 ## surface water connection -----------------------------------------------
 # read ewrims data, filter to SON, transform, select relevant cols
 ewrims <- dir_ls(path(data_path, "general/ewrims")) %>% 
-  read_csv(col_select = c("longitude", "latitude", "face_value_amount", "county"), 
+  read_csv(col_select = c("longitude", "latitude", 
+                          "face_value_amount", "county"), 
            col_types = list(
              longitude         = "d",
              latitude          = "d",
@@ -161,12 +155,14 @@ ewrims <- dir_ls(path(data_path, "general/ewrims")) %>%
 ewrims_key <- st_join(select(pson, APN), ewrims) %>% 
   st_drop_geometry() %>% 
   group_by(APN) %>% 
-  summarise(Surface_Water_Use_Ac_Ft = sum(Surface_Water_Use_Ac_Ft, na.rm = TRUE)) %>% 
+  summarise(Surface_Water_Use_Ac_Ft = sum(
+    Surface_Water_Use_Ac_Ft, na.rm = TRUE)
+  ) %>% 
   ungroup()
 
 pson <- left_join(pson, ewrims_key) %>% 
-  mutate(Surface_Water_Connection = ifelse(!is.na(Surface_Water_Use_Ac_Ft), 
-                                           "Yes", "No"))
+  mutate(Surface_Water_Connection = ifelse(
+    !is.na(Surface_Water_Use_Ac_Ft), "Yes", "No"))
 f_progress()
 f_verify_non_duplicates()
 
@@ -216,7 +212,8 @@ pson <- pson %>%
     Shared_Well_APN = NA, # placeholder for future review
     Well_Records_Available = ifelse(Well_Count > 0, "Yes", "No"),
     Onsite_Well = 
-      ifelse(Active_Well == "Yes" | Well_Records_Available == "Yes", "Yes", "No"),
+      ifelse(Active_Well == "Yes" | Well_Records_Available == "Yes", 
+             "Yes", "No"),
     Urban_Well = "No" # placeholder for future review
   ) 
 f_progress()
@@ -232,6 +229,9 @@ wsa <- path(data_path, "general", "water_system_boundaries",
   st_transform(epsg) %>% 
   st_intersection(son) %>% 
   select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1)
+
+# sanity check
+# mapview(pet) + mapview(wsa)
 
 # add water service areas to parcel data, first need to summarize data
 # to avoid duplicates where a parcel falls within more than one water system!
@@ -575,6 +575,13 @@ pson <- pson %>%
            Surface_Water_Use_Ac_Ft +
            Recycled_Water_Use_Ac_Ft)
 
+# if a parcel receives more water from surface and recycled sources 
+# than estimated demand, the calculated groundwater use is negative, so
+# we coerce this to zero
+pson <- pson %>% 
+  mutate(Ag_GW_Use_GIS_Ac_Ft = ifelse(
+    Ag_GW_Use_GIS_Ac_Ft < 0, 0, Ag_GW_Use_GIS_Ac_Ft))
+
 # No Idle Acres to start - this is reported
 pson <- pson %>% mutate(Idle_Ac = 0)
 
@@ -672,3 +679,9 @@ add[!add %in% colnames(pson)]
 
 f_progress()
 f_verify_non_duplicates()
+
+
+# write complete parcel data ----------------------------------------------
+
+pson %>% 
+  write_rds(path(data_path, "data_output/son_parcel_complete.rds"))
