@@ -396,9 +396,10 @@ pson <- pson %>%
   mutate(Commercial_GW_Use_Modified       = "No",
          Commercial_GW_Use_Modified_Ac_Ft = NA,
          Commercial_GW_Use_Comment        = NA,
-         Commercial_GW_Use_Ac_Ft = ifelse(Commercial_GW_Use_Modified == "Yes", 
-                                          Commercial_GW_Use_Modified_Ac_Ft, 
-                                          Commercial_GW_Use_Prelim_Ac_Ft))
+         Commercial_GW_Use_Ac_Ft          = ifelse(
+           Commercial_GW_Use_Modified == "Yes", 
+           Commercial_GW_Use_Modified_Ac_Ft, 
+           Commercial_GW_Use_Prelim_Ac_Ft))
 
 f_progress()
 f_verify_non_duplicates()
@@ -418,10 +419,10 @@ pson <- pson %>%
 
 # blank fields to permit revision of the data
 pson <- pson %>% 
-  mutate(Urban_Irrigation_Modified              = "No",
-         Urban_Irrigation_Modified_Ac_Ft        = NA,
-         Urban_Irrigation_GW_Use_Comment        = NA,
-         Urban_Irrigation_GW_Use_Ac_Ft = ifelse(
+  mutate(Urban_Irrigation_Modified       = "No",
+         Urban_Irrigation_Modified_Ac_Ft = NA,
+         Urban_Irrigation_GW_Use_Comment = NA,
+         Urban_Irrigation_GW_Use_Ac_Ft   = ifelse(
            Urban_Irrigation_Modified == "Yes", 
            Urban_Irrigation_GW_Use_Modified_Ac_Ft, 
            Urban_Irrigation_GW_Use_Prelim_Ac_Ft))
@@ -446,11 +447,6 @@ pson <- pson %>%
   mutate(School_Golf_GW_Use_Prelim_Ac_Ft = 
            ifelse(str_detect(UseCode_Description, "SCHOOL|GOLF"),
                   aw/LandSizeAcres, 0)) 
-
-# sanity check: SRP estimate was 200 AF/yr, and we calculate 201 here. passes.
-# pson %>% 
-#   pull(School_Golf_GW_Use_prelim_Ac_Ft) %>% 
-#   sum(na.rm = TRUE)
   
 # blank fields to permit revision of the data
 pson <- pson %>% 
@@ -563,12 +559,12 @@ f_verify_non_duplicates()
 pson <- pson %>% 
   mutate(
     # first ensure that NA values in water budget components go to 0
-    Water_Use_Ag_Rate_Ac_Ft  = ifelse(is.na(Water_Use_Ag_Rate_Ac_Ft), 
-                                      0, Water_Use_Ag_Rate_Ac_Ft),
-    Surface_Water_Use_Ac_Ft  = ifelse(is.na(Surface_Water_Use_Ac_Ft), 
-                                      0, Surface_Water_Use_Ac_Ft),
-    Recycled_Water_Use_Ac_Ft = ifelse(is.na(Recycled_Water_Use_Ac_Ft), 
-                                      0, Recycled_Water_Use_Ac_Ft),
+    Water_Use_Ag_Rate_Ac_Ft  = ifelse(
+      is.na(Water_Use_Ag_Rate_Ac_Ft), 0, Water_Use_Ag_Rate_Ac_Ft),
+    Surface_Water_Use_Ac_Ft  = ifelse(
+      is.na(Surface_Water_Use_Ac_Ft), 0, Surface_Water_Use_Ac_Ft),
+    Recycled_Water_Use_Ac_Ft = ifelse(
+      is.na(Recycled_Water_Use_Ac_Ft), 0, Recycled_Water_Use_Ac_Ft),
     # Ag GW use is the following mass balance:
     Ag_GW_Use_GIS_Ac_Ft = 
            Water_Use_Ag_Rate_Ac_Ft - 
