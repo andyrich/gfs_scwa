@@ -299,7 +299,8 @@ ppet <- left_join(ppet, wsa_key) %>%
 
 f_verify_non_duplicates()
 
-# TODO: add explicit connection data (blocke by Shelly)
+# -------------------------------------------------------------------------
+# TODO: add explicit connection data (blocked by Shelly)
 socity <- path(
   data_path, "son", "public_water_connection", "city_of_sonoma", 
   "Sonoma City Water Service Connections within the GSA.xlsx") %>% 
@@ -308,9 +309,10 @@ socity <- path(
 
 # if an explicit connection is present, ensure it is represented
 ppet <- ppet %>% 
-  mutate(Public_Water_Connection = 
-           ifelse(APN %in% socity$APN | Public_Water_Connection == "Yes", 
-                  "Yes", "No"))
+  mutate(Public_Water_Connection = ifelse(
+    APN %in% socity$APN | Public_Water_Connection == "Yes",
+    "Yes", "No"))
+# -------------------------------------------------------------------------
 
 # ensure public water connection is listed for specified Accessor Use Codes
 accessor_key_path <- path(data_path, "general/water_use_by_accessor_code/Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
@@ -323,9 +325,9 @@ pwc_accessor_key <- readxl::read_xlsx(accessor_key_path,
 # mark a public water service connection even if not explicitly listed
 ppet <- ppet %>% 
   mutate(Public_Water_Connection = ifelse(
-    CA_DrinkingWater_SvcArea_Within == "Yes" & UseCode %in% pwc_accessor_key$use_code,
-    "Yes", Public_Water_Connection
-  )
+    CA_DrinkingWater_SvcArea_Within == "Yes" & 
+      UseCode %in% pwc_accessor_key$use_code,
+    "Yes", Public_Water_Connection)
   )
 
 f_progress()
@@ -395,7 +397,7 @@ ppet <- ppet %>%
              res_rate_rural_triple, Res_GW_Use_Prelim_Ac_Ft)
   )
 
-# blank fields to permit revision of the data
+ # blank fields to permit revision of the data
 ppet <- ppet %>% 
   mutate(Res_GW_Use_Modified       = "No",
          Res_GW_Use_Modified_Ac_Ft = NA,
@@ -420,9 +422,11 @@ ppet <- left_join(ppet, res_use_accessor_key) %>%
   # NA values overwritten with 0
   mutate(
     Res_W_Use_Assessor_Ac_Ft = ifelse(
-      is.na(Res_W_Use_Assessor_Ac_Ft), 0, Res_W_Use_Assessor_Ac_Ft),
+      is.na(Res_W_Use_Assessor_Ac_Ft), 
+      0, Res_W_Use_Assessor_Ac_Ft),
     Commercial_W_Use_Assessor_Ac_Ft = ifelse(
-      is.na(Commercial_W_Use_Assessor_Ac_Ft), 0, Commercial_W_Use_Assessor_Ac_Ft)
+      is.na(Commercial_W_Use_Assessor_Ac_Ft), 
+      0, Commercial_W_Use_Assessor_Ac_Ft)
   )
 
 f_progress()
@@ -462,10 +466,10 @@ ppet <- ppet %>%
 
 # blank fields to permit revision of the data
 ppet <- ppet %>% 
-  mutate(Urban_Irrigation_Modified              = "No",
-         Urban_Irrigation_Modified_Ac_Ft        = NA,
-         Urban_Irrigation_GW_Use_Comment        = NA,
-         Urban_Irrigation_GW_Use_Ac_Ft = ifelse(
+  mutate(Urban_Irrigation_Modified       = "No",
+         Urban_Irrigation_Modified_Ac_Ft = NA,
+         Urban_Irrigation_GW_Use_Comment = NA,
+         Urban_Irrigation_GW_Use_Ac_Ft   = ifelse(
            Urban_Irrigation_Modified == "Yes", 
            Urban_Irrigation_GW_Use_Modified_Ac_Ft, 
            Urban_Irrigation_GW_Use_Prelim_Ac_Ft))
@@ -490,11 +494,6 @@ ppet <- ppet %>%
   mutate(School_Golf_GW_Use_Prelim_Ac_Ft = 
            ifelse(str_detect(UseCode_Description, "SCHOOL|GOLF"),
                   aw/LandSizeAcres, 0)) 
-
-# sanity check: SRP estimate was 200 AF/yr, and we calculate 201 here. passes.
-# ppet %>% 
-#   pull(School_Golf_GW_Use_prelim_Ac_Ft) %>% 
-#   sum(na.rm = TRUE)
 
 # blank fields to permit revision of the data
 ppet <- ppet %>% 
@@ -525,7 +524,7 @@ crop <- path(data_path, "general/crops/i15_Crop_Mapping_2018.shp") %>%
   filter(COUNTY == "Sonoma") %>% 
   st_transform(epsg) %>% 
   st_make_valid() %>% 
-  st_intersection(son) %>% 
+  st_intersection(pet) %>% 
   select(crop_class = CLASS2) %>% 
   mutate(crop_class = case_when(
     crop_class == "C" ~ "Citrus_and_Subtropical",
@@ -607,12 +606,12 @@ f_verify_non_duplicates()
 ppet <- ppet %>% 
   mutate(
     # first ensure that NA values in water budget components go to 0
-    Water_Use_Ag_Rate_Ac_Ft  = ifelse(is.na(Water_Use_Ag_Rate_Ac_Ft), 
-                                      0, Water_Use_Ag_Rate_Ac_Ft),
-    Surface_Water_Use_Ac_Ft  = ifelse(is.na(Surface_Water_Use_Ac_Ft), 
-                                      0, Surface_Water_Use_Ac_Ft),
-    Recycled_Water_Use_Ac_Ft = ifelse(is.na(Recycled_Water_Use_Ac_Ft), 
-                                      0, Recycled_Water_Use_Ac_Ft),
+    Water_Use_Ag_Rate_Ac_Ft  = ifelse(
+      is.na(Water_Use_Ag_Rate_Ac_Ft), 0, Water_Use_Ag_Rate_Ac_Ft),
+    Surface_Water_Use_Ac_Ft  = ifelse(
+      is.na(Surface_Water_Use_Ac_Ft), 0, Surface_Water_Use_Ac_Ft),
+    Recycled_Water_Use_Ac_Ft = ifelse(
+      is.na(Recycled_Water_Use_Ac_Ft), 0, Recycled_Water_Use_Ac_Ft),
     # Ag GW use is the following mass balance:
     Ag_GW_Use_GIS_Ac_Ft = 
       Water_Use_Ag_Rate_Ac_Ft - 
@@ -728,4 +727,4 @@ f_verify_non_duplicates()
 # write complete parcel data ----------------------------------------------
 
 ppet %>% 
-  write_rds(path(data_path, "data_output/son_parcel_complete.rds"))
+  write_rds(path(data_path, "data_output/pet_parcel_complete.rds"))
