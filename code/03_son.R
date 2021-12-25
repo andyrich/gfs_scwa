@@ -262,11 +262,19 @@ socity <- path(data_path, "son", "public_water_connection", "city_of_sonoma",
   readxl::read_xlsx() %>% 
   select(APN = `APN Dash`) 
 
+# add explicit connection data from VOMWD (Valley of Moon water district)
+vomwd <- path(data_path, "son", "public_water_connection", 
+              "VOMWD Data August 2021", 
+              "Master Location & Backflow data.xlsx") %>% 
+  readxl::read_xlsx(sheet = 1) %>% 
+  select(APN = `Parcel Number`) %>% 
+  filter(!is.na(APN))
+
 # if an explicit connection is present, ensure it is represented
 pson <- pson %>% 
-  mutate(Public_Water_Connection = 
-           ifelse(APN %in% socity$APN | Public_Water_Connection == "Yes", 
-                  "Yes", "No"))
+  mutate(Public_Water_Connection = ifelse(
+    APN %in% c(socity$APN, vomwd$APN) |  Public_Water_Connection == "Yes", 
+    "Yes", "No"))
 
 # ensure public water connection is listed for specified Accessor Use Codes
 accessor_key_path <- path(data_path, "general/water_use_by_accessor_code/Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
