@@ -31,6 +31,7 @@ ggplot() +
 
 # annual average pumping
 p_srp_sum <- p_srp %>% 
+  st_drop_geometry() %>% 
   group_by(date) %>% 
   summarise(total_pumpage_af = sum(q)) %>% 
   ungroup() 
@@ -93,7 +94,8 @@ p_pet <- map2_df(f_pet, c("agriculture", "M&I", "domestic"),
                    group_by(year, type) %>% 
                    summarise(total_pumpage_af = sum(QAF)) %>% 
                    ungroup()
-                 )
+                 ) %>% 
+  filter(year >= 2012) # consistent with GSP 
 
 cat("PET average annual (", glue::glue_collapse(range(p_pet$year), "-"),
     ") pumping in entire aquifer:")
@@ -129,6 +131,15 @@ bind_rows(
   tibble(type = "all", mean = mean(p_srp_sum$total_pumpage_af), gsa = "SRP"),
   mutate(pet_means, gsa = "PET"),
   mutate(son_means, gsa = "SON")
-  ) %>% 
+) %>% 
   rename(pumpage_af = mean) %>% 
+  write_csv(path(data_path, "tables/pump_summary.csv"))
+
+bind_rows(
+  mutate(p_srp_sum, gsa = "SRP", type = "all") %>% 
+    rename(year = date),
+  mutate(p_son, gsa = "SON"),
+  mutate(p_pet, gsa = "PET")
+) %>% 
+  rename(pumpage_af = total_pumpage_af) %>% 
   write_csv(path(data_path, "tables/pump.csv"))
