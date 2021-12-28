@@ -162,7 +162,8 @@ ewrims_key <- st_join(select(pson, APN), ewrims) %>%
 
 pson <- left_join(pson, ewrims_key) %>% 
   mutate(Surface_Water_Connection = ifelse(
-    !is.na(Surface_Water_Use_Ac_Ft), "Yes", "No"))
+    !is.na(Surface_Water_Use_Ac_Ft) & Surface_Water_Use_Ac_Ft > 0, 
+    "Yes", "No"))
 f_progress()
 f_verify_non_duplicates()
 
@@ -244,7 +245,11 @@ wsa_key <- st_join(pson, wsa) %>%
   ungroup() %>% 
   distinct() %>% 
   st_drop_geometry() %>% 
-  select(APN, CA_DrinkingWater_SvcArea_Name)
+  select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
+  # coerce character "NA" to NA
+  mutate(CA_DrinkingWater_SvcArea_Name = ifelse(
+    CA_DrinkingWater_SvcArea_Name == "NA", 
+    NA, CA_DrinkingWater_SvcArea_Name))
 
 pson <- left_join(pson, wsa_key) %>% 
   mutate(CA_DrinkingWater_SvcArea_Within = 
@@ -441,10 +446,13 @@ f_verify_non_duplicates()
 
 # schools and golf courses ------------------------------------------------
 
+# Reference ET0 in feet, via CIMIS ET0 zone 8: 
+# https://cimis.water.ca.gov/App_Themes/images/etozonemap.jpg
+et <- 4.1 
+
 # Calculate applied water at schools from ET assuming 
 # application efficiency = 0.65 (65%) from Sandoval, 2010. 
 # http://watermanagement.ucdavis.edu/research/application-efficiency/
-et <- 3.9 # feet, from avg annual ET0 at nearby CIMIS stations 77 and 109
 aw <- et / (1 - 0.65) # feet
 
 # school locations
@@ -500,7 +508,8 @@ crop <- path(data_path, "general/crops/i15_Crop_Mapping_2018.shp") %>%
 # get crops per APN and recalculate area, and as before, because there many
 # APN with > 1 crop, we need to make summarize the data before joining!
 crops_per_apn <- st_intersection(select(pson, APN), crop) %>% 
-  mutate(crop_acres = as.numeric(units::set_units(st_area(geometry), "acres"))) %>% 
+  mutate(crop_acres = 
+           as.numeric(units::set_units(st_area(geometry), "acres"))) %>% 
   # very important! Duplicates are present, and de-duplication is needed
   distinct() %>% 
   st_drop_geometry() %>% 
@@ -553,9 +562,11 @@ pson <- pson %>%
     Cannabis_Indoor_Rate             = 0, # no cannabis
     
     # summation columns
-    Total_Crop_Area_Prelim_Ac = rowSums(across(ends_with("Area_Ac")), na.rm = TRUE),
+    Total_Crop_Area_Prelim_Ac = rowSums(across(ends_with("Area_Ac")), 
+                                        na.rm = TRUE),
     Total_Crop_Area_Ac        = Total_Crop_Area_Prelim_Ac, 
-    Water_Use_Ag_Rate_Ac_Ft   = rowSums(across(ends_with("_Rate")), na.rm = TRUE)
+    Water_Use_Ag_Rate_Ac_Ft   = rowSums(across(ends_with("_Rate")), 
+                                        na.rm = TRUE)
   ) %>% 
   # replace NA areas and rates with 0
   mutate(across(ends_with("_Area_Ac"), ~ifelse(is.na(.x), 0, .x)),
