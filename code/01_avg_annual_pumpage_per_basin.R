@@ -60,7 +60,8 @@ p_son <- map2_df(f_son, c("agriculture", "M&I plus domestic"),
                    group_by(year, type) %>% 
                    summarise(total_pumpage_af = sum(QAF)) %>% 
                    ungroup()
-                 )
+                 ) %>% 
+  filter(year >= 2012) # consistent with GSP 
 
 cat("SON average annual (", glue::glue_collapse(range(p_son$year), "-"),
     ") pumping in entire aquifer:")
@@ -135,6 +136,7 @@ bind_rows(
   rename(pumpage_af = mean) %>% 
   write_csv(path(data_path, "tables/pump_summary.csv"))
 
+# pump data from models to compare to bucket model
 bind_rows(
   mutate(p_srp_sum, gsa = "SRP", type = "all") %>% 
     rename(year = date),
