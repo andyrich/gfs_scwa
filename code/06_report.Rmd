@@ -47,6 +47,12 @@ pson %>%
           zcol = "Total_Groundwater_Use_Ac_Ft",
           at = seq(0, 450, 50), 
           legend = c(TRUE, FALSE))
+
+# focus on ag since that's somewhat high compared to GSP
+pson %>% 
+    filter(!is.na(type) & Total_Groundwater_Use_Ac_Ft > 0 & type == "agriculture") %>% 
+    mapview(zcol = "Total_Groundwater_Use_Ac_Ft",
+            at = seq(0, 450, 50))
 ```
 
 ## Petaluma Valley
