@@ -1,0 +1,69 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(sf)
+library(here)
+library(fs)
+library(tidylog, warn.conflicts = FALSE)
+library(mapview)
+
+# groundwater budgets from groundwater flow models
+# pumping per user based on models, postprocessed by 01_avg_annual...R, 
+data_path <- "~/Dropbox (LWA)/data/sonoma_co_gsas_rate_fee"
+pump <- path(data_path, "tables/pump.csv") %>% read_csv()
+
+# SON database
+pson <- read_rds(path(data_path, "data_output/son_parcel_complete.rds")) %>% 
+  mutate(
+    type = ifelse(
+      UseCode_Category != "Agricultural" | is.na(UseCode_Category), 
+      "M&I plus domestic", "agriculture"),
+    basin = "Sonoma")
+
+# PET database
+ppet <- read_rds(path(data_path, "data_output/pet_parcel_complete.rds")) %>% 
+  mutate(
+    type = case_when(
+      UseCode_Category == "Agricultural" ~ "agriculture",
+      UseCode_Category == "Commercial" ~ "M&I", 
+      UseCode_Category %in% c("MultiFamily", "Residential") ~ "domestic", 
+      TRUE ~ UseCode_Category),
+    basin = "Petaluma")
+```
+
+## Sonoma Valley
+
+```{r}
+# total groundwater use per parcel spatial view
+pson %>% 
+  group_split(type) %>% 
+  mapview(layer.name = c("agriculture", "M&I plus domestic"),
+          zcol = "Total_Groundwater_Use_Ac_Ft",
+          at = seq(0, 450, 50), 
+          legend = c(TRUE, FALSE))
+```
+
+## Petaluma Valley
+
+```{r}
+# total groundwater use per parcel spatial view
+ppet %>% 
+  filter(!is.na(type) & Total_Groundwater_Use_Ac_Ft > 0) %>% 
+  group_split(type) %>% 
+  mapview(layer.name = c("agriculture", "M&I", "domestic"),
+          zcol = "Total_Groundwater_Use_Ac_Ft",
+          at = seq(0, 350, 50), 
+          legend = c(TRUE, FALSE, FALSE))
+
+# focus on M&I since that's too high
+ppet %>% 
+  filter(!is.na(type) & Total_Groundwater_Use_Ac_Ft > 0 & type == "M&I") %>% 
+  mapview(zcol = "Total_Groundwater_Use_Ac_Ft",
+          at = seq(0, 350, 50))
+```
