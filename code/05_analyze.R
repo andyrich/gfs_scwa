@@ -29,7 +29,7 @@ ppet <- read_rds(path(data_path, "data_output/pet_parcel_complete.rds")) %>%
     type = case_when(
       UseCode_Category == "Agricultural" ~ "agriculture",
       UseCode_Category == "Commercial" ~ "M&I", 
-      UseCode_Category %in% c("MultiFamily", "Residential") ~ "Domestic", 
+      UseCode_Category %in% c("MultiFamily", "Residential") ~ "domestic", 
       TRUE ~ UseCode_Category),
     basin = "Petaluma")
 
@@ -45,6 +45,7 @@ son_bucket <- pson %>%
   ungroup() %>% 
   arrange(desc(pumpage_af))
 
+
 pet_bucket <- ppet %>% 
   st_drop_geometry() %>% 
   group_by(type) %>% 
@@ -54,6 +55,10 @@ pet_bucket <- ppet %>%
   arrange(desc(pumpage_af)) %>% 
   filter(!is.na(type))
 
+# results from the parcel bucket model
+son_bucket
+pet_bucket
+
 
 # comparison of groundwater model and parcel bucket model -----------------
 
@@ -61,17 +66,41 @@ pet_bucket <- ppet %>%
 son_gwm <- pump %>% filter(gsa == "SON")
 
 ggplot() +
-  geom_jitter(data = son_gwm, aes(type, pumpage_af), height = 0) +
+  geom_point(
+    data = son_gwm, 
+    aes(type, pumpage_af), 
+    position = position_jitter(seed = 1, height = 0, width = 0.2),
+    alpha = 0.5
+  ) +
   geom_point(data = son_bucket, aes(type, pumpage_af), 
              color = "red") 
+
+
+# PET groundwater model
+pet_gwm <- pump %>% filter(gsa == "PET")
+
+ggplot() +
+  geom_point(
+    data = pet_gwm, 
+    aes(type, pumpage_af), 
+    position = position_jitter(seed = 1, height = 0, width = 0.2),
+    alpha = 0.5
+  ) +
+  geom_point(data = pet_bucket, aes(type, pumpage_af), 
+             color = "red") 
   
+
+# GSP doc water budget comparison to parcel buckets -----------------------
+
+
+
 
 # spatial distribution of pumping -----------------------------------------
 
 # total groundwater use per parcel spatial view
 pson %>% 
   group_split(type) %>% 
-  mapview(layer.name = c("Agricultural", "M&I + domestic"),
+  mapview(layer.name = c("Agricultural", "M&I plus domestic"),
           zcol = "pumpage_af",
           at = seq(0, 500, 100), legend = c(TRUE, FALSE))
 
