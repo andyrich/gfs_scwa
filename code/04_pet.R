@@ -673,8 +673,7 @@ ppet <- ppet %>%
     # Ag GW use is the following mass balance:
     Ag_GW_Use_GIS_Ac_Ft = 
       Water_Use_Ag_Rate_Ac_Ft - 
-      Surface_Water_Use_Ac_Ft +
-      Recycled_Water_Use_Ac_Ft)
+      (Surface_Water_Use_Ac_Ft + Recycled_Water_Use_Ac_Ft))
 
 # if a parcel receives more water from surface and recycled sources 
 # than estimated demand, the calculated groundwater use is negative, so
