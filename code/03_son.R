@@ -214,8 +214,7 @@ pson <- pson %>%
     Well_Records_Available = ifelse(Well_Count > 0, "Yes", "No"),
     Onsite_Well = 
       ifelse(Active_Well == "Yes" | Well_Records_Available == "Yes", 
-             "Yes", "No"),
-    Urban_Well = "No" # placeholder for future review
+             "Yes", "No")
   ) 
 f_progress()
 f_verify_non_duplicates()
@@ -275,10 +274,23 @@ vomwd <- path(data_path, "son", "public_water_connection",
   select(APN = `Parcel Number`) %>% 
   filter(!is.na(APN))
 
+# add explicit connection data from Petaluma, Sebastapol, Sonoma, Penngrove,
+# and Valley of the Moonb WD - from Shelly on 2021-12-17, 
+# Re: F/U | Permit Sonoma GIS: GSA Water Service Connection | ID APN-to-Address
+shelly_path <- path(data_path, "general", "address_apn.gdb")
+shelly <- rgdal::ogrListLayers(shelly_path) %>% 
+  purrr::map_df(
+    ~rgdal::readOGR(dsn = shelly_path, layer = .x) %>% 
+      st_as_sf() %>% 
+      select(APN))
+
+# APNs with explicit connections
+explicit_connections <- unique(c(socity$APN, vomwd$APN, shelly$APN))
+
 # if an explicit connection is present, ensure it is represented
 pson <- pson %>% 
   mutate(Public_Water_Connection = ifelse(
-    APN %in% c(socity$APN, vomwd$APN) |  Public_Water_Connection == "Yes", 
+    APN %in% explicit_connections | Public_Water_Connection == "Yes", 
     "Yes", "No"))
 
 # ensure public water connection is listed for specified Accessor Use Codes
@@ -296,6 +308,52 @@ pson <- pson %>%
     "Yes", Public_Water_Connection
     )
   )
+
+f_progress()
+f_verify_non_duplicates()
+
+
+# urban wells -------------------------------------------------------------
+
+# explicit connection data from VOMWD (Valley of Moon water district)
+vomwd_apn_st <- path(data_path, "son", "public_water_connection", 
+                     "VOMWD Data August 2021", 
+                     "Master Location & Backflow data.xlsx") %>% 
+  readxl::read_xlsx(sheet = 1) %>% 
+  select(APN = `Parcel Number`, st_no = `Street Number`, st = `Street Name`) %>% 
+  filter(!is.na(APN)) %>% 
+  mutate(st = paste(st_no, st)) %>% 
+  select(-st_no) %>% 
+  distinct()
+
+# get APNs of parcels with an urban well connection, see 2021-09-13 email
+# from Rob Pennington for methods: VOMWD  Urban Well Use Logic
+vomwd_urban_wells <- path(data_path, "son", "public_water_connection", 
+                          "VOMWD Data August 2021", 
+                          "Master Location & Backflow data.xlsx") %>% 
+  readxl::read_xlsx(sheet = 2) %>% 
+  select(st_no = `Street Number`, st = `Street Name`,
+         well = `Well on Site`, bf = `BF Type`, notes = Notes) %>% 
+  mutate(st = paste(st_no, st)) %>% 
+  select(-st_no) %>% 
+  distinct() %>% 
+  left_join(vomwd_apn_st) %>% 
+  group_by(APN) %>% 
+  summarise(well = paste(well, collapse = " "), 
+            bf = paste(bf, collapse = " "),
+            notes = paste(notes, collapse = " ")) %>% 
+  ungroup() %>% 
+  mutate(
+    Urban_Well = ifelse(str_detect(well, "Yes"), "Yes", "No"), 
+    Urban_Well = ifelse(str_detect(notes, "HOA") & 
+                  str_detect(bf, "RP") & 
+                  str_detect(well, "NA"), 
+                "Yes", Urban_Well)) %>% 
+  filter(Urban_Well == "Yes")
+
+# add urban wells from VOMWD
+pson <- pson %>% 
+  mutate(Urban_Well = ifelse(APN %in% vomwd_urban_wells$APN, "Yes", "No"))
 
 f_progress()
 f_verify_non_duplicates()

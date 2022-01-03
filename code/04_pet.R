@@ -351,12 +351,24 @@ socity <- path(
   readxl::read_xlsx() %>% 
   select(APN = `APN Dash`) 
 
+# add explicit connection data from Petaluma, Sebastapol, Sonoma, Penngrove,
+# and Valley of the Moonb WD - from Shelly on 2021-12-17, 
+# Re: F/U | Permit Sonoma GIS: GSA Water Service Connection | ID APN-to-Address
+shelly_path <- path(data_path, "general", "address_apn.gdb")
+shelly <- rgdal::ogrListLayers(shelly_path) %>% 
+  purrr::map_df(
+    ~rgdal::readOGR(dsn = shelly_path, layer = .x) %>% 
+      st_as_sf() %>% 
+      select(APN))
+
+# APNs with explicit connections
+explicit_connections <- unique(c(socity$APN, shelly$APN))
+
 # if an explicit connection is present, ensure it is represented
 ppet <- ppet %>% 
   mutate(Public_Water_Connection = ifelse(
-    APN %in% socity$APN | Public_Water_Connection == "Yes",
+    APN %in% explicit_connections | Public_Water_Connection == "Yes",
     "Yes", "No"))
-# -------------------------------------------------------------------------
 
 # ensure public water connection is listed for specified Accessor Use Codes
 accessor_key_path <- path(data_path, "general/water_use_by_accessor_code/Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
