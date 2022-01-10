@@ -344,34 +344,28 @@ ppet <- left_join(ppet, wsa_key) %>%
 f_verify_non_duplicates()
 
 # -------------------------------------------------------------------------
-# TODO: add explicit connection data (blocked by Shelly)
-socity <- path(
-  data_path, "son", "public_water_connection", "city_of_sonoma", 
-  "Sonoma City Water Service Connections within the GSA.xlsx") %>% 
-  readxl::read_xlsx() %>% 
-  select(APN = `APN Dash`) 
-
 # add explicit connection data from Petaluma, Sebastapol, Sonoma, Penngrove,
-# and Valley of the Moonb WD - from Shelly on 2021-12-17, 
-# Re: F/U | Permit Sonoma GIS: GSA Water Service Connection | ID APN-to-Address
+# and Valley of the Moonb WD - from Shelly on 2022-01-04, Email Subject:
+# Data Revision/Addition | Permit Sonoma GIS: GSA Water Service Connection | ID APN-to-Address
 shelly_path <- path(data_path, "general", "address_apn.gdb")
-shelly <- rgdal::ogrListLayers(shelly_path) %>% 
+cat("Reading explicit connection data for:\n", 
+    paste(rgdal::ogrListLayers(shelly_path), collapse = "\n "), "\n")
+
+explicit_connections <- rgdal::ogrListLayers(shelly_path) %>% 
   purrr::map_df(
     ~rgdal::readOGR(dsn = shelly_path, layer = .x) %>% 
       st_as_sf() %>% 
       select(APN))
 
-# APNs with explicit connections
-explicit_connections <- unique(c(socity$APN, shelly$APN))
-
 # if an explicit connection is present, ensure it is represented
 ppet <- ppet %>% 
   mutate(Public_Water_Connection = ifelse(
-    APN %in% explicit_connections | Public_Water_Connection == "Yes",
+    APN %in% explicit_connections$APN | Public_Water_Connection == "Yes",
     "Yes", "No"))
 
 # ensure public water connection is listed for specified Accessor Use Codes
-accessor_key_path <- path(data_path, "general/water_use_by_accessor_code/Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
+accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
+                          "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
 pwc_accessor_key <- accessor_key_path %>% 
   readxl::read_xlsx(sheet = 3, range = "B2:C27") %>% 
   janitor::clean_names() %>% 
@@ -392,79 +386,26 @@ f_verify_non_duplicates()
 
 # residential water use ---------------------------------------------------
 
-# From Raftellis Fee Study: Any residential (or residential and agricultural 
-# use) parcels remaining in areas outside of water service provider systems 
-# are assumed to have or use groundwater from a private well. Available records 
-# of water wells within the Subbasin are incomplete [and not spatially accurate
-# enough] and not used to assess which parcels extract groundwater... used an 
-# estimate of 0.5 AF of water use per year for each developed rural residential 
-# parcel... An additional 0.25 AF were added for any parcels that listed 
-# additional residences on the parcel, up to a maximum of 1 AF per year. 
-
 # The Urban Residential Groundwater user class represents residential properties
 # in areas served by water service providers that also have a well on the 
 # property... Raftelis and Staff assumed that these wells would primarily be 
 # used for irrigation purposes... it is assumed that Urban Residential Groundwater 
 # Users extract on average 0.1 AF per parcel per year for irrigation purposes.
 
-res_rate_rural_single <- 0.50 # acre feet/year for 1 building
-res_rate_rural_double <- 0.75 # acre feet/year for 2 buildings
-res_rate_rural_triple <- 1.00 # acre feet/year for >=3 buildings
-
-res_rate_urban <- 0.1 # acre feet/year for urban parcels with a well
-
-# use code descriptions mapped to single, double, or 3+ buildings
-res_single <- c("SINGLE FAMILY DWELLING", "RURAL RES/SINGLE RES", 
-                "ATTACHED UNIT", "CONDOMINIUM UNIT", "ONE DUPLEX (ONE STRUCTURE)",
-                "DETACHED UNIT IN A PUD", "ENFORCEABLY RESTRICTED DWELLING",
-                "MANUFACTURED HOME ON URBAN LOT", "RURAL RES W/MISC RES IMP",
-                "RURAL RES/MANUFACTURED HOME", "SINGLE LIVE/WORK UNIT",
-                "RURAL RES/SECONDARY USE", "TAXABLE MANUFACTURED HOME/RENTED SITE",
-                "COOPERATIVE")
-res_double <- c("RURAL RES/2 OR MORE RES", "RURAL RES SFD W/GRANNY UNIT",
-                "SFD W/GRANNY UNIT", "TWO SFD ON SINGLE PARCEL", "DUET")
-res_triple <- c("COMMON AREA WITH STRUCTURES")
-
-# rural and urban groundwater use: 4 cases
-ppet <- ppet %>% 
-  mutate(
-    # case 1: urban residential: within water system with onsite well
-    # that's not in the deactivated wells list specific to PET
-    Res_GW_Use_Prelim_Ac_Ft = 
-      ifelse(Public_Water_Connection == "Yes" & 
-               Onsite_Well == "Yes" & 
-               # specific to PET
-               !APN %in% deactivated_wells$APN, 
-             res_rate_urban, NA),
-    # case 2: rural residential outside water system with 1 building
-    Res_GW_Use_Prelim_Ac_Ft = 
-      ifelse(Public_Water_Connection == "No" & 
-               UseCode_Description %in% res_double &
-               UseCode_Description == "Residential",
-             res_rate_rural_single, Res_GW_Use_Prelim_Ac_Ft),
-    # case 3: rural residential outside water system with 2 buildings
-    Res_GW_Use_Prelim_Ac_Ft = 
-      ifelse(Public_Water_Connection == "No" & 
-               UseCode_Description %in% res_double &
-               UseCode_Description == "Residential",
-             res_rate_rural_double, Res_GW_Use_Prelim_Ac_Ft),
-    # case 4: rural residential outside water system with 3 buildings
-    Res_GW_Use_Prelim_Ac_Ft = 
-      ifelse(Public_Water_Connection == "No" & 
-               UseCode_Description %in% res_triple &
-               UseCode_Description == "Residential",
-             res_rate_rural_triple, Res_GW_Use_Prelim_Ac_Ft)
-  )
-
- # blank fields to permit revision of the data
-ppet <- ppet %>% 
-  mutate(Res_GW_Use_Modified       = "No",
-         Res_GW_Use_Modified_Ac_Ft = NA,
-         Res_GW_Use_Comment        = NA,
-         Res_GW_Use_Ac_Ft = ifelse(Res_GW_Use_Modified == "Yes", 
-                                   Res_GW_Use_Modified_Ac_Ft, 
-                                   Res_GW_Use_Prelim_Ac_Ft))
-
+# res_rate_urban <- 0.1 # acre feet/year for urban parcels with a well
+# 
+# # rural and urban groundwater use: 4 cases
+# ppet <- ppet %>% 
+#   mutate(
+#     # case 1: urban residential: within water system with onsite well
+#     # that's not in the deactivated wells list specific to PET
+#     Res_GW_Use_Prelim_Ac_Ft = 
+#       ifelse(Public_Water_Connection == "Yes" & 
+#                Onsite_Well == "Yes" & 
+#                # specific to PET
+#                !APN %in% deactivated_wells$APN, 
+#              res_rate_urban, NA)
+#   )
 
 # Res_W_Use_Assessor_Ac_Ft = Water use rate based off assessor use code
 # Dependency provided by Rob P on 2021-11-16
@@ -477,16 +418,25 @@ res_use_accessor_key <- readxl::read_xlsx(accessor_key_path,
          Commercial_W_Use_Assessor_Ac_Ft = commercial_industrial_misc_use)
 
 # add Residential and Commercial Water Use based on Accessor Code
-ppet <- left_join(ppet, res_use_accessor_key) %>% 
-  # NA values overwritten with 0
-  mutate(
-    Res_W_Use_Assessor_Ac_Ft = ifelse(
-      is.na(Res_W_Use_Assessor_Ac_Ft), 
-      0, Res_W_Use_Assessor_Ac_Ft),
-    Commercial_W_Use_Assessor_Ac_Ft = ifelse(
-      is.na(Commercial_W_Use_Assessor_Ac_Ft), 
-      0, Commercial_W_Use_Assessor_Ac_Ft)
-  )
+ppet <- left_join(ppet, res_use_accessor_key) 
+
+# Res_GW_Use_Prelim_Ac_Ft is Res_W_Use_Assessor_Ac_Ft if
+# there's no public water connection, otherwise, it's 0
+ppet <- ppet %>% 
+  mutate(Res_GW_Use_Prelim_Ac_Ft = ifelse(
+    Public_Water_Connection == "No", 
+    Res_W_Use_Assessor_Ac_Ft,
+    0
+  ))
+
+# blank fields to permit revision of the data
+ppet <- ppet %>% 
+  mutate(Res_GW_Use_Modified       = "No",
+         Res_GW_Use_Modified_Ac_Ft = NA,
+         Res_GW_Use_Comment        = NA,
+         Res_GW_Use_Ac_Ft = ifelse(Res_GW_Use_Modified == "Yes", 
+                                   Res_GW_Use_Modified_Ac_Ft, 
+                                   Res_GW_Use_Prelim_Ac_Ft))
 
 f_progress()
 f_verify_non_duplicates()
@@ -502,6 +452,16 @@ deactivated_wells <- path(data_path, "pet/public_water_connection",
 
 ppet <- ppet %>% 
   left_join(deactivated_wells)
+
+# Commercial_GW_Use_Prelim_Ac_Ft is Commercial_W_Use_Assessor_Ac_Ft if
+# there's no public water connection, otherwise, it's 0
+ppet <- ppet %>% 
+  mutate(Commercial_GW_Use_Prelim_Ac_Ft = ifelse(
+    Public_Water_Connection == "No" &
+      is.na(Commercial_GW_Use_Prelim_Ac_Ft), 
+    Commercial_W_Use_Assessor_Ac_Ft,
+    Commercial_GW_Use_Prelim_Ac_Ft
+  ))
 
 # blank fields to permit revision of the data
 ppet <- ppet %>% 
@@ -604,7 +564,7 @@ crop <- path(data_path, "general/crops/i15_Crop_Mapping_2018.shp") %>%
   ))
 
 # get crops per APN and recalculate area, and as before, because there many
-# APN with > 1 crop, we need to make summarize the data before joining!
+# APN with > 1 crop, we need to summarize the data before joining!
 crops_per_apn <- st_intersection(select(ppet, APN), crop) %>% 
   mutate(crop_acres = 
            as.numeric(units::set_units(st_area(geometry), "acres"))) %>% 
@@ -617,12 +577,13 @@ crops_per_apn <- st_intersection(select(ppet, APN), crop) %>%
   summarise(crop_acres = sum(crop_acres, na.rm = TRUE)) %>% 
   ungroup()
 
-# applied water (in acre feet per acre) per crop from the Raftellis report
-# crop class "X" (other) does not have a value in the report, so assume 0.6
+# applied water (in acre feet per acre) per crop, for references, see Rob
+# Pennington's Sheet path(data_path, "general/crop_water_use/Crop Type Vs Water Use v3.xlsx")
+# and email 2022-01-10 Re: Ongoing technical question log
 crop_applied_water <- tibble(
   crop_class = c("Citrus_and_Subtropical", "Deciduous_Fruit_and_Nuts", 
                  "Truck_and_Berry_Crops", "Vine", "Grain", "Pasture", "X"),
-  applied_af_acre = c(1.8, 1.8, 1.8, 0.6, 0.3, 0.04, 0.6))
+  applied_af_acre = c(1.85, 1.83, 1.78, 0.6, 0, 0.04, 0))
 
 # add applied water and calculate acre feet used per parcel, but because there
 # are multiple crops per field, we need to make sure the output dataframe has
@@ -652,12 +613,12 @@ ppet <- ppet %>%
   left_join(crops_per_apn_key) %>% 
   mutate(
     # crop area per parcel
-    Cannabis_Outdoor_Area_Ac         = 0, # no cannabis
-    Cannabis_Indoor_Area_Ac          = 0, # no cannabis
+    Cannabis_Outdoor_Area_Ac         = 0, # no cannabis data
+    Cannabis_Indoor_Area_Ac          = 0, # no cannabis data
     
     # crop consumptive use (AF/year)
-    Cannabis_Outdoor_Rate            = 0, # no cannabis
-    Cannabis_Indoor_Rate             = 0, # no cannabis
+    Cannabis_Outdoor_Rate            = 0, 
+    Cannabis_Indoor_Rate             = 0, 
     
     # summation columns
     Total_Crop_Area_Prelim_Ac = rowSums(across(ends_with("Area_Ac")), 
