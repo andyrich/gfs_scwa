@@ -23,10 +23,6 @@ gsas <- reduce(list(son, pet, srp), st_union) %>% as("Spatial")
 parcel <- st_read(path(data_path, "general/parcel/CDR_PARCEL_PUB_SHP_vw.shp")) %>% 
   st_transform(epsg) %>% 
   st_make_valid() %>% 
-  # some acres are wrong: re-calculate at APN level
-  mutate(LndSzAcre = st_area(geometry) %>% 
-           units::set_units(acres) %>% 
-           as.numeric()) %>% 
   as("Spatial")
 
 
@@ -35,10 +31,43 @@ gsa_parcel <- parcel[gsas, ]
 cat(round(nrow(gsa_parcel@data) / nrow(parcel@data) * 100, 2), 
     "% of Sonoma Co parcels within GSAs.")
 
+# some acres are wrong: re-calculate at APN level
+gsa_parcel <- st_as_sf(gsa_parcel) %>% 
+  mutate(LndSzAcre = st_area(geometry) %>% 
+         units::set_units(acres) %>% 
+         as.numeric()) 
+
 # intersect parcels to GSA boundaries and write for later use
-future::plan(multisession, workers = 3)
-furrr::future_walk2(list(son, pet, srp), 
-      glue::glue('{c("son", "pet", "srp")}_parcel.rds'), 
-      ~st_intersection(st_as_sf(gsa_parcel), .x) %>% 
-        write_rds(path(data_path, "data_output", .y))
-      )
+aoi_in <- list(son, pet, srp)
+file_out <- glue::glue('{c("son", "pet", "srp")}_parcel.rds')
+for(i in seq_along(aoi_in)){
+  st_intersection(gsa_parcel, aoi_in[[i]]) %>% 
+    write_rds(path(data_path, "data_output", file_out[i]))
+  cat("Wrote", file_out[i], "\n")
+}
+
+# SRP data from Shelly ----------------------------------------------------
+
+srp_gdb_path <- path(data_path, "srp", "SRP_GSA_RevisedSchema.gdb")
+cat("Reading in explicit connection data for:\n", 
+    paste(rgdal::ogrListLayers(srp_gdb_path), collapse = "\n "))
+
+psrp <- rgdal::ogrListLayers(srp_gdb_path)[2] %>% 
+  rgdal::readOGR(dsn = srp_gdb_path, layer = .) %>% 
+  st_as_sf() %>% 
+  st_transform(epsg) %>% 
+  st_make_valid() %>% 
+  as("Spatial")
+
+# crop shelly's SRP parcels to GSA boundaries, intersect with SRP and write
+gsa_psrp <- psrp[gsas, ]
+
+# some acres are wrong: re-calculate at APN level
+gsa_psrp <- gsa_psrp %>% 
+  st_as_sf() %>% 
+  mutate(LandSizeAcres = st_area(geometry) %>% 
+         units::set_units(acres) %>% 
+         as.numeric()) 
+
+st_intersection(gsa_psrp, srp) %>% 
+  write_rds(path(data_path, "data_output/srp_parcel_shelly.rds"))
