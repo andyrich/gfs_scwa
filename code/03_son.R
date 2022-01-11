@@ -102,6 +102,13 @@ pson <- pson %>%
   ) %>% 
   # remove intermediate vars
   select(-area_prop_apn)
+
+# if not a basin boundary parcel, it's an interior GSA parcel
+pson <- pson %>% 
+  mutate(GSA_Jurisdiction_Prelim = ifelse(
+    is.na(GSA_Jurisdiction_Prelim),
+    "Petaluma Valley", GSA_Jurisdiction_Prelim))
+
 f_progress()
 
 # sanity check
@@ -489,7 +496,7 @@ aw <- et / (1 - 0.65) # feet
 pson <- pson %>% 
   mutate(School_Golf_GW_Use_Prelim_Ac_Ft = 
            ifelse(str_detect(UseCode_Description, "SCHOOL|GOLF"),
-                  aw/LandSizeAcres, 0)) 
+                  (aw/LandSizeAcres)*0.5, 0)) 
   
 # blank fields to permit revision of the data
 pson <- pson %>% 
