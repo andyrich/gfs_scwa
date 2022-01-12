@@ -53,6 +53,16 @@ cat("Removed", length(rem), "fields from parcel database.\n   ",
     paste(rem, collapse = "\n    "))
 
 
+
+# ad hoc cleaning post-shelly's work --------------------------------------
+
+psrp <- psrp %>% 
+  mutate(x = ifelse(
+    CA_DrinkingWater_SvcArea_Name == "Not In Public Water System",
+    NA,
+    CA_DrinkingWater_SvcArea_Name
+  ))
+
 # basin boundary parcels --------------------------------------------------
 
 # Does the parcel overlap SRP, Petaluma, or Sonoma Valley basins?
