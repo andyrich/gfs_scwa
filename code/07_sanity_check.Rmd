@@ -405,23 +405,22 @@ psrp %>%
   count(CA_DrinkingWater_SvcArea_Name, sort = TRUE)
 
 # what water systems do we *actually* have water use data for?
-psrp %>% 
+wsu_srp <- psrp %>% 
   st_drop_geometry() %>% 
   filter(Public_Water_Connection == "Yes", 
          CA_DrinkingWater_SvcArea_Name != "Not In Public Water System") %>% 
   group_by(CA_DrinkingWater_SvcArea_Name) %>% 
-  summarise(w_use_af = 
+  summarise(use_af_parcel = 
               sum(Res_W_Use_Assessor_Ac_Ft, 
                   Commercial_W_Use_Assessor_Ac_Ft, na.rm = TRUE)) %>% 
   ungroup() %>% 
-  arrange(desc(w_use_af)) 
+  arrange(desc(use_af_parcel)) 
+wsu_srp
 ```
 
 
 ## SON
 
-Missing data for VOMWD and Sonoma City. Would explain perhaps the higher calculated commercial/residential water use here.
-
 ```{r}
 # what water systems *should* we have water use data for?
 pson %>% 
@@ -429,23 +428,22 @@ pson %>%
   count(CA_DrinkingWater_SvcArea_Name, sort = TRUE)
 
 # what water systems do we *actually* have water use data for?
-pson %>% 
+wsu_son <- pson %>% 
   st_drop_geometry() %>% 
   filter(Public_Water_Connection == "Yes",
          !is.na(CA_DrinkingWater_SvcArea_Name)) %>%
   group_by(CA_DrinkingWater_SvcArea_Name) %>% 
-  summarise(w_use_af = 
+  summarise(use_af_parcel = 
               sum(Res_W_Use_Assessor_Ac_Ft, 
                   Commercial_W_Use_Assessor_Ac_Ft, na.rm = TRUE)) %>% 
   ungroup() %>% 
-  arrange(desc(w_use_af))
+  arrange(desc(use_af_parcel))
+wsu_son
 ```
 
 
 ## PET
 
-Missing data for Penngrove. Would explain perhaps the higher calculated commercial/residential water use here.
-
 ```{r}
 # what water systems *should* we have water use data for?
 ppet %>% 
@@ -453,14 +451,88 @@ ppet %>%
   count(CA_DrinkingWater_SvcArea_Name, sort = TRUE)
 
 # what water systems do we *actually* have water use data for?
-ppet %>% 
+wsu_pet <- ppet %>% 
   st_drop_geometry() %>% 
   filter(Public_Water_Connection == "Yes",
          !is.na(CA_DrinkingWater_SvcArea_Name)) %>%
   group_by(CA_DrinkingWater_SvcArea_Name) %>% 
-  summarise(w_use_af = 
+  summarise(use_af_parcel = 
               sum(Res_W_Use_Assessor_Ac_Ft, 
                   Commercial_W_Use_Assessor_Ac_Ft, na.rm = TRUE)) %>% 
   ungroup() %>% 
-  arrange(desc(w_use_af))
+  arrange(desc(use_af_parcel))
+wsu_pet
 ```
+
+Combine model estimated water data (from Accessor rates and water system boundaries as calculated above) with data reported to the state water Board.
+
+```{r}
+# annual water use from the Water Board
+wu <- xlsx::read.xlsx(
+  path(data_path, "general/pws_water_use",
+       "2020 EAR Water Suppy and Deilvery data for Sonoma District PWS.xlsx"), 
+  sheetIndex = 1, colIndex = c(1, 7, 99)) %>% 
+  rename(pwsid = PwsID, use = WPAnnualTotal, unit = WPUnitsofMeasure) %>% 
+  mutate(
+    # convert all units to AF
+    use_af_board = case_when(
+      unit == "MG"  ~ use * 3.68558063,
+      unit == "G"   ~ use * 3.06889e-6,
+      unit == "CCF" ~ use * 0.00229569,
+      unit == "AF"  ~ use * 1),
+    unit = "AF"
+  ) %>% 
+  select(-use)
+
+# water service areas in California
+rm_pwsid <- c("CA2110003")
+wsa <- path(data_path, "general", "water_system_boundaries",
+            "SABL_Public_083121/SABL_Public_083121.shp") %>% 
+  st_read() %>% 
+  st_transform(epsg) %>% 
+  st_intersection(st_union(son, pet, srp)) %>% 
+  select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1,
+         pwsid = SABL_PWSID) %>% 
+  left_join(wu) %>%
+  filter(!is.na(use_af_board) & ! pwsid %in% rm_pwsid)
+
+# attach water use
+wu <- arrange(wsa, desc(use_af_board)) %>% 
+  left_join(bind_rows(wsu_srp, wsu_son, wsu_pet)) %>%
+  mutate(name = ifelse(
+    use_af_parcel > 500,
+    str_wrap(CA_DrinkingWater_SvcArea_Name, 13),
+    NA)
+  )
+  
+p1 <- wu %>% 
+  ggplot(aes(use_af_parcel, use_af_board, 
+             text = CA_DrinkingWater_SvcArea_Name)) + 
+  geom_point(alpha = 0.5) + 
+  geom_abline(slope = 1, linetype = "dashed") +
+  ggrepel::geom_label_repel(aes(label = name), size = 2,
+                            fill = "white", alpha = 1) + 
+  annotate("rect", xmin = -10, xmax = 100, ymin = -10, ymax = 100,
+           alpha = .1, color = "red") +
+  coord_cartesian(ylim = c(0, 4000), xlim = c(0, 4000)) +
+  scale_y_continuous(expand = c(0.01, 0.01)) +
+  scale_x_continuous(expand = c(0.01, 0.01)) +
+  labs(x = "Water use (Parcel)", y = "Water use (Board)",
+       title = "Comparison of Annual Water Use (AF)",
+       subtitle = "Parcel (estimated) and Water Board (reported)") +
+  cowplot::theme_cowplot()
+
+p2 <- wu %>% 
+  ggplot(aes(use_af_parcel, use_af_board)) + 
+  geom_point(alpha = 0.5) + 
+  geom_abline(slope = 1, linetype = "dashed") +
+  labs(x = "", y = "") +
+  coord_cartesian(ylim = c(0, 100), xlim = c(0, 100)) +
+  cowplot::theme_cowplot()  + 
+  theme(plot.background = element_rect(color = "red"), 
+        plot.margin = unit(c(10,10,-10,-10), units = "points"))
+
+p1 + inset_element(p2, 0.05, 0.6, 0.45, 1)
+plotly::ggplotly(p1, tooltip = c("text", "x", "y"))
+```
+
