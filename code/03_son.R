@@ -354,24 +354,6 @@ f_progress()
 f_verify_non_duplicates()
 
 
-# public water system reported use from SWRCB -----------------------------
-
-# wsu <- path(data_path, "general/pws_water_use",
-#             "2020 EAR Water Suppy and Deilvery data for Sonoma District PWS.xlsx"
-#             ) %>% 
-#   readxl::read_xlsx() %>% 
-#   select(pwsid = PwsID, gw = WPAnnualGW, unit = WPUnitsofMeasure) %>% 
-#   filter(!is.na(unit)) %>% 
-#   # convert gallons and million gallons to acre-feet
-#   mutate(gw_af = case_when(
-#     unit == "G"  ~ gw * 3.06889e-6,
-#     unit == "MG" ~ gw * 3.06889)
-#   ) %>% 
-#   filter(gw_af > 0)
-# 
-# wsa <- left_join(wsa, wsu)
-
-
 # residential water use ---------------------------------------------------
 
 # The Urban Residential Groundwater user class represents residential properties
