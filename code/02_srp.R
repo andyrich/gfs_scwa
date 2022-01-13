@@ -57,11 +57,19 @@ cat("Removed", length(rem), "fields from parcel database.\n   ",
 # ad hoc cleaning post-shelly's work --------------------------------------
 
 psrp <- psrp %>% 
-  mutate(x = ifelse(
-    CA_DrinkingWater_SvcArea_Name == "Not In Public Water System",
-    NA,
-    CA_DrinkingWater_SvcArea_Name
-  ))
+  mutate(
+    # fix NA water systems to match SON and PET
+    CA_DrinkingWater_SvcArea_Name = ifelse(
+      CA_DrinkingWater_SvcArea_Name == "Not In Public Water System",
+      NA,
+      CA_DrinkingWater_SvcArea_Name)
+  ) %>% 
+  separate(UseCode_Description, 
+           into = c("UseCode", "UseCode_Description"), 
+           sep = " ", 
+           extra = "merge") %>% 
+  # remove brackets
+  mutate(UseCode_Description = str_remove_all(UseCode_Description, "\\[|\\]"))
 
 # basin boundary parcels --------------------------------------------------
 
@@ -134,7 +142,7 @@ f_progress()
 #   rename(Recycled_Water_Use_Ac_Ft = af_yr_2016)
 
 # add recycled water parcels to parcel data
-# pson <- left_join(pson, recy, by = "APN") %>% 
+# psrp <- left_join(psrp, recy, by = "APN") %>% 
 #   mutate(Recycled_Water_Connection = ifelse(
 #     !is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No"))
 # f_progress()
@@ -202,17 +210,17 @@ f_progress()
 #   slice(1) %>% 
 #   ungroup()
 
-# DEPRICATED: simplified by joining spatial well data to pson above
+# DEPRICATED: simplified by joining spatial well data to psrp above
 # combine and return vector of APNs with a well present
 # scwells_apn <- left_join(scwells, scwells_data, by = "Log_No") %>% 
 #   # There is a lot of WCR data we're dropping, but it's all there!
 #   select(Log_No) %>% 
-#   st_intersection(select(pson, APN)) %>% 
+#   st_intersection(select(psrp, APN)) %>% 
 #   pull(APN) %>% 
 #   unique()
 
 # populate database columns
-# pson <- pson %>% 
+# psrp <- psrp %>% 
 #   left_join(scwells) %>% 
 #   mutate(
 #     # no well count means 0 onsite wells
@@ -245,7 +253,7 @@ f_progress()
 
 # add water service areas to parcel data, first need to summarize data
 # to avoid duplicates where a parcel falls within more than one water system!
-# wsa_key <- st_join(pson, wsa) %>% 
+# wsa_key <- st_join(psrp, wsa) %>% 
 #   select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
 #   group_by(APN) %>% 
 #   # for parcels with > 1 water system, combine water system names
@@ -260,7 +268,7 @@ f_progress()
 #     CA_DrinkingWater_SvcArea_Name == "NA", 
 #     NA, CA_DrinkingWater_SvcArea_Name))
 # 
-# pson <- left_join(pson, wsa_key) %>% 
+# psrp <- left_join(psrp, wsa_key) %>% 
 #   mutate(CA_DrinkingWater_SvcArea_Within = 
 #            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"),
 #          Public_Water_Connection_Modified = NA,
@@ -284,7 +292,7 @@ f_progress()
 #       select(APN))
 # 
 # # if an explicit connection is present, ensure it is represented
-# pson <- pson %>% 
+# psrp <- psrp %>% 
 #   mutate(Public_Water_Connection = ifelse(
 #     APN %in% explicit_connections$APN | Public_Water_Connection == "Yes", 
 #     "Yes", "No"))
@@ -299,7 +307,7 @@ f_progress()
 # 
 # # if the parcel is within a water service area and the use code is listed, 
 # # mark a public water service connection even if not explicitly listed
-# pson <- pson %>% 
+# psrp <- psrp %>% 
 #   mutate(Public_Water_Connection = ifelse(
 #     CA_DrinkingWater_SvcArea_Within == "Yes" & UseCode %in% pwc_accessor_key$use_code,
 #     "Yes", Public_Water_Connection
@@ -349,7 +357,7 @@ f_progress()
 #   filter(Urban_Well == "Yes")
 
 # add urban wells from VOMWD
-# pson <- pson %>% 
+# psrp <- psrp %>% 
 #   mutate(Urban_Well = ifelse(APN %in% vomwd_urban_wells$APN, "Yes", "No"))
 # 
 # f_progress()
@@ -384,7 +392,7 @@ f_progress()
 
 # res_rate_urban <- 0.1 # acre feet/year for urban parcels with a well
 # 
-# pson <- pson %>% 
+# psrp <- psrp %>% 
 #   mutate(
 #     # case 1: urban residential: within water system with onsite well
 #     Res_GW_Use_Prelim_Ac_Ft = 
@@ -395,25 +403,30 @@ f_progress()
 
 # Res_W_Use_Assessor_Ac_Ft = Water use rate based off assessor use code
 # Dependency provided by Rob P on 2021-11-16
-# res_use_accessor_key <- readxl::read_xlsx(accessor_key_path, 
-#                                           sheet = 2) %>% 
-#   janitor::clean_names() %>% 
-#   mutate(UseCode = str_pad(land_use_code, 4, "left", "0")) %>% 
-#   select(UseCode, 
-#          Res_W_Use_Assessor_Ac_Ft = residential_use, 
-#          Commercial_W_Use_Assessor_Ac_Ft = commercial_industrial_misc_use)
+accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
+                          "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
+res_use_accessor_key <- readxl::read_xlsx(accessor_key_path,
+                                          sheet = 2) %>%
+  janitor::clean_names() %>%
+  mutate(UseCode = str_pad(land_use_code, 4, "left", "0")) %>%
+  select(UseCode,
+         Res_W_Use_Assessor_Ac_Ft = residential_use,
+         Commercial_W_Use_Assessor_Ac_Ft = commercial_industrial_misc_use)
 
 # add Residential and Commercial Water Use based on Accessor Code
-# pson <- left_join(pson, res_use_accessor_key) 
-# 
-# # Res_GW_Use_Prelim_Ac_Ft is Res_W_Use_Assessor_Ac_Ft if
-# # there's no public water connection, otherwise, it's 0
-# pson <- pson %>% 
-#   mutate(Res_GW_Use_Prelim_Ac_Ft = ifelse(
-#     Public_Water_Connection == "No", 
-#     Res_W_Use_Assessor_Ac_Ft,
-#     0
-#   ))
+psrp <- psrp %>% 
+  select(-all_of(c("Res_W_Use_Assessor_Ac_Ft",
+                   "Commercial_W_Use_Assessor_Ac_Ft")))
+psrp <- left_join(psrp, res_use_accessor_key)
+
+# Res_GW_Use_Prelim_Ac_Ft is Res_W_Use_Assessor_Ac_Ft if
+# there's no public water connection, otherwise, it's 0
+psrp <- psrp %>%
+  mutate(Res_GW_Use_Prelim_Ac_Ft = ifelse(
+    Public_Water_Connection == "No", 
+    Res_W_Use_Assessor_Ac_Ft,
+    0
+  ))
 
 # blank fields to permit revision of the data
 psrp <- psrp %>%
@@ -433,13 +446,13 @@ psrp <- psrp %>%
 
 # Commercial_GW_Use_Prelim_Ac_Ft is Commercial_W_Use_Assessor_Ac_Ft if
 # there's no public water connection, otherwise, it's 0
-# pson <- pson %>% 
-#   mutate(Commercial_GW_Use_Prelim_Ac_Ft = ifelse(
-#     Public_Water_Connection == "No", 
-#     Commercial_W_Use_Assessor_Ac_Ft,
-#     0
-#   ))
-# 
+psrp <- psrp %>%
+  mutate(Commercial_GW_Use_Prelim_Ac_Ft = ifelse(
+    Public_Water_Connection == "No",
+    Commercial_W_Use_Assessor_Ac_Ft,
+    0
+  ))
+ 
 # # blank fields to permit revision of the data
 psrp <- psrp %>%
   mutate(Commercial_GW_Use_Modified       = "No",
@@ -461,7 +474,7 @@ psrp <- psrp %>%
 # Cities will be used in the future to set to "Yes"'
 
 # if there’s an urban well & public water connection, assume 0.1 AF/yr, else 0
-# pson <- pson %>% 
+# psrp <- psrp %>% 
 #   mutate(
 #     Urban_Irrigation_GW_Use_Prelim_Ac_Ft = ifelse(
 #       Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
@@ -566,7 +579,7 @@ crop_applied_water <- tibble(
 
 # add applied water and calculate acre feet used per parcel, but because there
 # are multiple crops per field, we need to make sure the output dataframe has
-# only one row per APN, and is in wide format ready for the join to `pson`
+# only one row per APN, and is in wide format ready for the join to `psrp`
 crops_per_apn_key <- left_join(crops_per_apn, crop_applied_water) %>% 
   mutate(applied_af = crop_acres * applied_af_acre) %>% 
   select(-applied_af_acre) %>% 

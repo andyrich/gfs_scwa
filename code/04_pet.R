@@ -254,32 +254,10 @@ all_wells <- bind_rows(sc_wells, pet_wells)
 ps_wells <- path(data_path, "pet/public_water_connection",
                  "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
   readxl::read_xlsx(sheet = 3) %>% 
-  select(APN = APN_NoHyp) %>% 
-  mutate(
-    APN = glue::glue(
-      "{substr(APN, 1, 3)}-{substr(APN, 4, 6)}-{substr(APN, 7, 9)}")) 
+  select(APN) 
 
 # remove permit sonoma wells
 all_wells <- all_wells %>% filter(!APN %in% ps_wells$APN)
-
-# DEPRICATED: just know that more detailed well data is here
-# Sonoma count well data - deduplicate
-# sc_wells_data <- path(data_path, "general", 
-#                      "soco_wells/all_sonoma_county_wells.xlsx") %>% 
-#   readxl::read_xlsx() %>% 
-#   select(APN:OtherObservations) %>% 
-#   group_by(Log_No) %>% 
-#   slice(1) %>% 
-#   ungroup()
-
-# DEPRICATED: simplified by joining spatial well data to ppet above
-# combine and return vector of APNs with a well present
-# sc_wells_apn <- left_join(sc_wells, sc_wells_data, by = "Log_No") %>% 
-#   # There is a lot of WCR data we're dropping, but it's all there!
-#   select(Log_No) %>% 
-#   st_intersection(select(ppet, APN)) %>% 
-#   pull(APN) %>% 
-#   unique()
 
 # populate database columns
 ppet <- ppet %>% 
@@ -301,10 +279,7 @@ ppet <- ppet %>%
 deactivated_wells <- path(data_path, "pet/public_water_connection",
                           "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
   readxl::read_xlsx(sheet = 4) %>% 
-  select(APN = APN_NoHyp) %>% 
-  mutate(
-    APN = glue::glue(
-      "{substr(APN, 1, 3)}-{substr(APN, 4, 6)}-{substr(APN, 7, 9)}")) 
+  select(APN) 
 
 f_progress()
 f_verify_non_duplicates()
@@ -350,7 +325,7 @@ ppet <- left_join(ppet, wsa_key) %>%
 
 f_verify_non_duplicates()
 
-# -------------------------------------------------------------------------
+
 # add explicit connection data from Petaluma, Sebastapol, Sonoma, Penngrove,
 # and Valley of the Moonb WD - from Shelly on 2022-01-04, Email Subject:
 # Data Revision/Addition | Permit Sonoma GIS: GSA Water Service Connection | ID APN-to-Address
@@ -451,23 +426,29 @@ f_verify_non_duplicates()
 
 # commercial water use ----------------------------------------------------
 
-# reported commercial uses
-deactivated_wells <- path(data_path, "pet/public_water_connection",
+# reported commercial uses from Petaluma
+large_commercial_uses <- path(data_path, "pet/public_water_connection",
                           "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
   readxl::read_xlsx(sheet = 6) %>% 
-  select(APN, Commercial_GW_Use_Prelim_Ac_Ft = `ac-ft/yr`) 
+  select(APN, replacement_commercial_use = `ac-ft/yr`) 
 
+# add these reported large commercial uses
 ppet <- ppet %>% 
-  left_join(deactivated_wells)
+  left_join(large_commercial_uses) %>% 
+  mutate(Commercial_W_Use_Assessor_Ac_Ft = ifelse(
+    !is.na(replacement_commercial_use),
+    replacement_commercial_use,
+    Commercial_W_Use_Assessor_Ac_Ft
+  )) %>% 
+  select(-replacement_commercial_use)
 
 # Commercial_GW_Use_Prelim_Ac_Ft is Commercial_W_Use_Assessor_Ac_Ft if
 # there's no public water connection, otherwise, it's 0
 ppet <- ppet %>% 
   mutate(Commercial_GW_Use_Prelim_Ac_Ft = ifelse(
-    Public_Water_Connection == "No" &
-      is.na(Commercial_GW_Use_Prelim_Ac_Ft), 
+    Public_Water_Connection == "No", 
     Commercial_W_Use_Assessor_Ac_Ft,
-    Commercial_GW_Use_Prelim_Ac_Ft
+    0
   ))
 
 # blank fields to permit revision of the data

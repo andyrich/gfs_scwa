@@ -268,23 +268,51 @@ pson <- left_join(pson, wsa_key) %>%
 
 f_verify_non_duplicates()
 
+# add explicit connection data from City of Sonoma
+# path_sonoma_city <- path(
+#   data_path, "son/public_water_connection/city_of_sonoma",
+#   "Sonoma City Water Service Connections within the GSA.xlsx")
+# 
+# connections_sonoma_city <- xlsx::read.xlsx(path_sonoma_city, 
+#                                            sheetIndex = 1, 
+#                                            colIndex = c(9, 14)) %>% 
+#   select(APN = `APN.Dash`, has_res_service = `Has.Res.Service`) %>% 
+#   # NA values are stored as " "
+#   filter(has_res_service != " ")
+
+# add explicit connection data from VOMWD
+# path_vomwd <- path(
+#   data_path, "son/public_water_connection/VOMWD Data August 2021",
+#   "Master Location & Backflow data.xlsx")
+# 
+# connections_vomwd <- xlsx::read.xlsx(path_vomwd, 
+#                                            sheetIndex = 1, 
+#                                            colIndex = 4) %>% 
+#   select(APN = `Parcel.Number`) %>% 
+#   # remove a few bogus APNs
+#   filter(nchar(APN) == 11)
+
 # add explicit connection data from Petaluma, Sebastapol, Sonoma, Penngrove,
-# and Valley of the Moonb WD - from Shelly on 2022-01-04, Email Subject:
+# and Valley of the Moon WD - from Shelly on 2022-01-04, Email Subject:
 # Data Revision/Addition | Permit Sonoma GIS: GSA Water Service Connection | ID APN-to-Address
 shelly_path <- path(data_path, "general", "address_apn.gdb")
 cat("Reading in explicit connection data for:\n", 
     paste(rgdal::ogrListLayers(shelly_path), collapse = "\n "))
 
-explicit_connections <- rgdal::ogrListLayers(shelly_path) %>% 
+connections_shelly <- rgdal::ogrListLayers(shelly_path) %>% 
   purrr::map_df(
     ~rgdal::readOGR(dsn = shelly_path, layer = .x) %>% 
       st_as_sf() %>% 
       select(APN))
 
-# if an explicit connection is present, ensure it is represented
+# if an explicit connection is present from any of the sources above
+# ensure it is represented
 pson <- pson %>% 
   mutate(Public_Water_Connection = ifelse(
-    APN %in% explicit_connections$APN | Public_Water_Connection == "Yes", 
+    APN %in% connections_shelly$APN | 
+      # APN %in% connections_sonoma_city$APN |
+      # APN %in% connections_vomwd$APN |
+      Public_Water_Connection == "Yes", 
     "Yes", "No"))
 
 # ensure public water connection is listed for specified Accessor Use Codes
@@ -299,7 +327,8 @@ pwc_accessor_key <- readxl::read_xlsx(accessor_key_path,
 # mark a public water service connection even if not explicitly listed
 pson <- pson %>% 
   mutate(Public_Water_Connection = ifelse(
-    CA_DrinkingWater_SvcArea_Within == "Yes" & UseCode %in% pwc_accessor_key$use_code,
+    CA_DrinkingWater_SvcArea_Within == "Yes" & 
+      UseCode %in% pwc_accessor_key$use_code,
     "Yes", Public_Water_Connection
     )
   )
@@ -390,7 +419,7 @@ pson <- left_join(pson, res_use_accessor_key)
 # there's no public water connection, otherwise, it's 0
 pson <- pson %>% 
   mutate(Res_GW_Use_Prelim_Ac_Ft = ifelse(
-    Public_Water_Connection == "No", 
+    Public_Water_Connection == "No",  
     Res_W_Use_Assessor_Ac_Ft,
     0
   ))
