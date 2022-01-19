@@ -317,11 +317,7 @@ wsa_key <- st_join(ppet, wsa) %>%
 
 ppet <- left_join(ppet, wsa_key) %>% 
   mutate(CA_DrinkingWater_SvcArea_Within = 
-           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"),
-         Public_Water_Connection_Modified = NA,
-         Public_Water_Connection = 
-           ifelse(CA_DrinkingWater_SvcArea_Within == "Yes", "Yes", "No"), 
-         Water_Source_Comment = NA)
+           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
 f_verify_non_duplicates()
 
@@ -333,7 +329,7 @@ shelly_path <- path(data_path, "general", "address_apn.gdb")
 cat("Reading explicit connection data for:\n", 
     paste(rgdal::ogrListLayers(shelly_path), collapse = "\n "), "\n")
 
-explicit_connections <- rgdal::ogrListLayers(shelly_path) %>% 
+connections_shelly <- rgdal::ogrListLayers(shelly_path)[1] %>% 
   purrr::map_df(
     ~rgdal::readOGR(dsn = shelly_path, layer = .x) %>% 
       st_as_sf() %>% 
@@ -341,9 +337,14 @@ explicit_connections <- rgdal::ogrListLayers(shelly_path) %>%
 
 # if an explicit connection is present, ensure it is represented
 ppet <- ppet %>% 
-  mutate(Public_Water_Connection = ifelse(
-    APN %in% explicit_connections$APN | Public_Water_Connection == "Yes",
-    "Yes", "No"))
+  mutate(
+    Public_Water_Connection = 
+      ifelse(APN %in% connections_shelly$APN |
+               !is.na(CA_DrinkingWater_SvcArea_Name), 
+             "Yes", "No"),
+    Public_Water_Connection_Modified = NA,
+    Water_Source_Comment = NA
+  )
 
 # ensure public water connection is listed for specified Accessor Use Codes
 accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",

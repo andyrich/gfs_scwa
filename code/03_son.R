@@ -260,11 +260,7 @@ wsa_key <- st_join(pson, wsa) %>%
 
 pson <- left_join(pson, wsa_key) %>% 
   mutate(CA_DrinkingWater_SvcArea_Within = 
-           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"),
-         Public_Water_Connection_Modified = NA,
-         Public_Water_Connection = 
-           ifelse(CA_DrinkingWater_SvcArea_Within == "Yes", "Yes", "No"), 
-         Water_Source_Comment = NA)
+           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
 f_verify_non_duplicates()
 
@@ -308,12 +304,29 @@ connections_shelly <- rgdal::ogrListLayers(shelly_path) %>%
 # if an explicit connection is present from any of the sources above
 # ensure it is represented
 pson <- pson %>% 
-  mutate(Public_Water_Connection = ifelse(
-    APN %in% connections_shelly$APN | 
-      # APN %in% connections_sonoma_city$APN |
-      # APN %in% connections_vomwd$APN |
-      Public_Water_Connection == "Yes", 
-    "Yes", "No"))
+  mutate(
+    Public_Water_Connection = 
+      ifelse(APN %in% connections_shelly$APN, "Yes", "No"),
+    Public_Water_Connection_Modified = NA,
+    Water_Source_Comment = NA
+    )
+
+# if there's not explicit connection data (which come from big systems 
+# recorded below), and the system is small and within a water service
+# boundary, then assume a connection is present, because we're unlikely
+# to obtain data from these small systems. exclude city of sonoma becase
+# they have incompelte data
+systems_explicit_data <- c("VALLEY OF THE MOON WATER DISTRICT")
+
+pson <- pson %>% 
+  mutate(
+    Public_Water_Connection = ifelse(
+      ! CA_DrinkingWater_SvcArea_Name %in% systems_explicit_data & 
+        !is.na(CA_DrinkingWater_SvcArea_Name),
+      "Yes",
+      Public_Water_Connection
+    )
+  )
 
 # ensure public water connection is listed for specified Accessor Use Codes
 accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",

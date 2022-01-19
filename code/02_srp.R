@@ -281,22 +281,23 @@ f_progress()
 # add explicit connection data from Petaluma, Sebastapol, Sonoma, Penngrove,
 # and Valley of the Moonb WD - from Shelly on 2022-01-04, Email Subject:
 # Data Revision/Addition | Permit Sonoma GIS: GSA Water Service Connection | ID APN-to-Address
-# shelly_path <- path(data_path, "general", "address_apn.gdb")
-# cat("Reading in explicit connection data for:\n", 
-#     paste(rgdal::ogrListLayers(shelly_path), collapse = "\n "))
-# 
-# explicit_connections <- rgdal::ogrListLayers(shelly_path) %>% 
-#   purrr::map_df(
-#     ~rgdal::readOGR(dsn = shelly_path, layer = .x) %>% 
-#       st_as_sf() %>% 
-#       select(APN))
-# 
-# # if an explicit connection is present, ensure it is represented
-# psrp <- psrp %>% 
-#   mutate(Public_Water_Connection = ifelse(
-#     APN %in% explicit_connections$APN | Public_Water_Connection == "Yes", 
-#     "Yes", "No"))
-# 
+windsor_path <- path(data_path, "srp", "public_water_connection",
+                     "Windsor Water Service.gdb")
+cat("Reading in explicit connection data for:\n",
+    paste(rgdal::ogrListLayers(windsor_path), collapse = "\n "))
+
+explicit_connections <- rgdal::ogrListLayers(windsor_path)[2] %>%
+  purrr::map_df(
+    ~rgdal::readOGR(dsn = windsor_path, layer = .x) %>%
+      st_as_sf() %>%
+      select(APN))
+
+# if an explicit connection is present, ensure it is represented
+psrp <- psrp %>%
+  mutate(Public_Water_Connection = ifelse(
+    APN %in% explicit_connections$APN | Public_Water_Connection == "Yes",
+    "Yes", "No"))
+
 # # ensure public water connection is listed for specified Accessor Use Codes
 # accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
 #                           "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
