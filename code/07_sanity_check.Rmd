@@ -67,8 +67,7 @@ ppet <- read_rds(path(data_path, "data_output/pet_parcel_complete.rds")) %>%
   mutate(
     type = case_when(
       UseCode_Category == "Agricultural" ~ "agriculture",
-      UseCode_Category == "Commercial" ~ "M&I", 
-      UseCode_Category %in% c("MultiFamily", "Residential") ~ "domestic", 
+      UseCode_Category %in% c("Commercial", "MultiFamily", "Residential") ~ "M&I plus domestic", 
       TRUE ~ UseCode_Category),
     basin = "Petaluma Valley")
 ```
@@ -167,9 +166,8 @@ pet_raw_bucket <- ppet %>%
   ) %>% 
   mutate(
     agriculture = agriculture + school_golf,
-    `M&I`    = commercial + urban_irrigation,
-    domestic = residential, 
-    total    = agriculture + `M&I` + domestic
+    `M&I plus domestic` = commercial + urban_irrigation + residential,
+    total = agriculture + `M&I plus domestic`
   )
 
 # results from bucket raw 1
@@ -182,7 +180,7 @@ son_raw_bucket1 <- son_raw_bucket %>%
   pivot_longer(everything(), names_to = "type", values_to = "pumpage_af")
 
 pet_raw_bucket1 <- pet_raw_bucket %>% 
-  select(agriculture, `M&I`, domestic) %>%
+  select(agriculture, `M&I plus domestic`) %>%
   pivot_longer(everything(), names_to = "type", values_to = "pumpage_af")
 
 # print
@@ -280,9 +278,8 @@ pet_raw_bucket2 <- ppet %>%
   ) %>% 
   mutate(
     agriculture = agriculture + school_golf,
-    `M&I`    = commercial + urban_irrigation,
-    domestic = residential, 
-    total    = agriculture + `M&I` + domestic
+    `M&I plus domestic` = commercial + urban_irrigation + residential,
+    total = agriculture + `M&I plus domestic`
   )
 
 # results from bucket raw 2
@@ -295,7 +292,7 @@ son_raw_bucket2 <- son_raw_bucket2 %>%
   pivot_longer(everything(), names_to = "type", values_to = "pumpage_af")
 
 pet_raw_bucket2 <- pet_raw_bucket2 %>% 
-  select(agriculture, `M&I`, domestic) %>%
+  select(agriculture, `M&I plus domestic`) %>%
   pivot_longer(everything(), names_to = "type", values_to = "pumpage_af")
 
 # print
@@ -336,17 +333,16 @@ gwm <- tribble(
     "SON",  "agriculture",       3800,       3100,      4300,
     "SON",  "M&I plus domestic", 1900,       1400,      2000,
     "PET",  "agriculture",       2000,       1900,      2150,
-    "PET",  "M&I",               200,        0,         400,
-    "PET",  "domestic",          300,        300,       300) 
+    "PET",  "M&I plus domestic", 500,        300,       700) 
 
 b0 <- bind_rows(srp_usecode_bucket, son_usecode_bucket, pet_usecode_bucket) %>% 
-  mutate(basin = c("SRP", "SRP", "SON", "SON", "PET", "PET", "PET")) %>% 
+  mutate(basin = c("SRP", "SRP", "SON", "SON", "PET", "PET")) %>% 
   rename(pump_parcel = pumpage_af)
 b1 <- bind_rows(srp_raw_bucket1, son_raw_bucket1, pet_raw_bucket1) %>% 
-  mutate(basin = c("SRP", "SRP", "SON", "SON", "PET", "PET", "PET")) %>% 
+  mutate(basin = c("SRP", "SRP", "SON", "SON", "PET", "PET")) %>% 
   rename(pump_parcel = pumpage_af)
 b2 <- bind_rows(srp_raw_bucket2, son_raw_bucket2, pet_raw_bucket2) %>% 
-  mutate(basin = c("SRP", "SRP", "SON", "SON", "PET", "PET", "PET")) %>% 
+  mutate(basin = c("SRP", "SRP", "SON", "SON", "PET", "PET")) %>% 
   rename(pump_parcel = pumpage_af)
 
 left_join(gwm, b0, by = c("basin", "type")) %>% 
