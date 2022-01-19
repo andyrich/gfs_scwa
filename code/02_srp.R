@@ -738,6 +738,11 @@ psrp <- psrp %>%
 # Situs_Address 
 
 
+
+# drop UseCode ------------------------------------------------------------
+
+psrp <- psrp %>% select(-UseCode)
+
 # final manual tests ------------------------------------------------------
 
 # sanity check: cols that still need to be added
