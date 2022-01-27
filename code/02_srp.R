@@ -98,6 +98,8 @@ psrp <- psrp %>%
     area_prop_apn = LandSizeAcres / Intersect_GSA_Bndry_Sum_Acres,
     GSA_Jurisdiction_Prelim = ifelse(area_prop_apn > 0.5, 
                                      "Santa Rosa Plain", "Petaluma Valley"),
+    GSA_Jurisdiction_Prelim = ifelse(is.na(GSA_Jurisdiction_Prelim), 
+                                     "Santa Rosa Plain", GSA_Jurisdiction_Prelim),
     # intentionally left blank for clients to evaluate and populate
     GSA_Jurisdiction_Modified = NA,
     GSA_Jurisdiction_Mod_Value = NA,
