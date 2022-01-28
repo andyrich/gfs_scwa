@@ -242,43 +242,44 @@ f_progress()
 ## water service areas ----------------------------------------------------
 
 # water service areas in SON
-# wsa <- path(data_path, "general", "water_system_boundaries",
-#             "SABL_Public_083121/SABL_Public_083121.shp") %>% 
-#   st_read() %>% 
-#   st_transform(epsg) %>% 
-#   st_intersection(son) %>% 
-#   select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1,
-#          pwsid = SABL_PWSID)
+wsa <- path(data_path, "general", "water_system_boundaries",
+            "SABL_Public_083121/SABL_Public_083121.shp") %>%
+  st_read() %>%
+  st_transform(epsg) %>%
+  st_make_valid() %>% 
+  st_intersection(srp) %>%
+  select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1,
+         pwsid = SABL_PWSID)
 
 # sanity check
 # mapview(pet) + mapview(wsa)
 
+# rm Shelly's work
+psrp$CA_DrinkingWater_SvcArea_Name <- NULL
+psrp$CA_DrinkingWater_SvcArea_Within <- NULL
+
 # add water service areas to parcel data, first need to summarize data
 # to avoid duplicates where a parcel falls within more than one water system!
-# wsa_key <- st_join(psrp, wsa) %>% 
-#   select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
-#   group_by(APN) %>% 
-#   # for parcels with > 1 water system, combine water system names
-#   mutate(CA_DrinkingWater_SvcArea_Name = paste(
-#     CA_DrinkingWater_SvcArea_Name, collapse = "; ")) %>%
-#   ungroup() %>% 
-#   distinct() %>% 
-#   st_drop_geometry() %>% 
-#   select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
-#   # coerce character "NA" to NA
-#   mutate(CA_DrinkingWater_SvcArea_Name = ifelse(
-#     CA_DrinkingWater_SvcArea_Name == "NA", 
-#     NA, CA_DrinkingWater_SvcArea_Name))
-# 
-# psrp <- left_join(psrp, wsa_key) %>% 
-#   mutate(CA_DrinkingWater_SvcArea_Within = 
-#            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"),
-#          Public_Water_Connection_Modified = NA,
-#          Public_Water_Connection = 
-#            ifelse(CA_DrinkingWater_SvcArea_Within == "Yes", "Yes", "No"), 
-#          Water_Source_Comment = NA)
-# 
-# f_verify_non_duplicates()
+wsa_key <- st_join(psrp, wsa) %>% 
+  select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
+  group_by(APN) %>% 
+  # for parcels with > 1 water system, combine water system names
+  mutate(CA_DrinkingWater_SvcArea_Name = paste(
+    CA_DrinkingWater_SvcArea_Name, collapse = "; ")) %>%
+  ungroup() %>% 
+  distinct() %>% 
+  st_drop_geometry() %>% 
+  select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
+  # coerce character "NA" to NA
+  mutate(CA_DrinkingWater_SvcArea_Name = ifelse(
+    CA_DrinkingWater_SvcArea_Name == "NA", 
+    NA, CA_DrinkingWater_SvcArea_Name))
+
+psrp <- left_join(psrp, wsa_key) %>% 
+  mutate(CA_DrinkingWater_SvcArea_Within = 
+           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
+
+f_verify_non_duplicates()
 
 # add explicit connection data from Petaluma, Sebastapol, Sonoma, Penngrove,
 # and Valley of the Moonb WD - from Shelly on 2022-01-04, Email Subject:
@@ -371,15 +372,15 @@ psrp <- psrp %>%
 
 # wsu <- path(data_path, "general/pws_water_use",
 #             "2020 EAR Water Suppy and Deilvery data for Sonoma District PWS.xlsx"
-#             ) %>% 
-#   readxl::read_xlsx() %>% 
-#   select(pwsid = PwsID, gw = WPAnnualGW, unit = WPUnitsofMeasure) %>% 
-#   filter(!is.na(unit)) %>% 
+#             ) %>%
+#   readxl::read_xlsx() %>%
+#   select(pwsid = PwsID, name = PWSName, gw = WPAnnualGW, unit = WPUnitsofMeasure) %>%
+#   filter(!is.na(unit)) %>%
 #   # convert gallons and million gallons to acre-feet
 #   mutate(gw_af = case_when(
 #     unit == "G"  ~ gw * 3.06889e-6,
 #     unit == "MG" ~ gw * 3.06889)
-#   ) %>% 
+#   ) %>%
 #   filter(gw_af > 0)
 # 
 # wsa <- left_join(wsa, wsu)
