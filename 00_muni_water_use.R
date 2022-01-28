@@ -1,6 +1,7 @@
 library(tidyverse)
 library(fs)
 library(here)
+library(sf)
 
 # ddw reported data
 l <- fs::dir_ls(path(data_path, "general/pws_water_use"), glob = "*.csv") %>% 
@@ -18,6 +19,11 @@ l <- fs::dir_ls(path(data_path, "general/pws_water_use"), glob = "*.csv") %>%
 d <- bind_rows(l)
 
 # all water systems we need data for
+psrp <- read_rds(path(data_path, "data_output/srp_parcel_complete.rds"))
+pson <- read_rds(path(data_path, "data_output/son_parcel_complete.rds")) 
+ppet <- read_rds(path(data_path, "data_output/pet_parcel_complete.rds"))
+all <- bind_rows(psrp, pson, ppet)
+
 dw <- all$CA_DrinkingWater_SvcArea_Name %>% unique()
 
 # pwsids of systems we need data for
@@ -29,7 +35,7 @@ pwsid_key <- path(data_path, "general", "water_system_boundaries",
   select(name = WATER_SY_1, pwsid = SABL_PWSID)
 
 # calcualte average annual gw use from 2013-2019
-muni_gw <- d %>% 
+muni_gw <- d %>%
   left_join(pwsid_key) %>% 
   filter(name %in% dw & !is.na(name)) %>% 
   # incorrect units create errors for two entries - remove them
@@ -38,6 +44,23 @@ muni_gw <- d %>%
   summarise(gw_af = mean(gw_af)) %>% 
   ungroup() 
 
+# add GSA names to pwsid and write
+ddw_gw <- all %>% 
+  st_drop_geometry() %>% 
+  select(name = CA_DrinkingWater_SvcArea_Name, 
+         gsa = GSA_Jurisdiction_Prelim) %>% 
+  distinct() %>% 
+  right_join(muni_gw)
+
+ddw_gw %>% 
+  write_csv(here("data_output/muni_use_audit.csv"))
+
+ddw_gw %>% 
+  group_by(gsa) %>% 
+  summarise(sum_gw_af = sum(gw_af)) %>% 
+  ungroup()
+
+# missing water systems
 tibble(name = dw[! dw %in% muni_gw$name]) %>% 
   left_join(pwsid_key) %>% 
   filter(!is.na(name))
