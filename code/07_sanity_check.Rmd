@@ -551,14 +551,15 @@ wsu_srp <- psrp %>%
   st_drop_geometry() %>% 
   filter(Public_Water_Connection == "Yes", 
          CA_DrinkingWater_SvcArea_Name != "Not In Public Water System") %>% 
-  group_by(CA_DrinkingWater_SvcArea_Name) %>% 
+  group_by(CA_DrinkingWater_SvcArea_Name) %>%
   summarise(res_use_af = sum(Res_W_Use_Assessor_Ac_Ft, na.rm = TRUE),
-            com_use_af = sum(Commercial_W_Use_Assessor_Ac_Ft, na.rm = TRUE)) %>% 
-  ungroup() %>% 
+            com_use_af = sum(Commercial_W_Use_Assessor_Ac_Ft, na.rm = TRUE)) %>%
+  ungroup() %>%
   mutate(total_use_af = res_use_af + com_use_af)
 
 wsu_srp %>% 
-  arrange(desc(res_use_af, com_use_af)) %>% 
+  # arrange(desc(res_use_af, com_use_af)) %>% 
+  arrange(desc(sum_gw_af)) %>% 
   DT::datatable(rownames = FALSE)
 ```
 

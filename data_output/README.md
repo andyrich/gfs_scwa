@@ -13,3 +13,11 @@ _Last updated 2021-01-27_
 `soco_gsas_parcel.geojson` is the same as above but saved as geojson and does not abbreviate field names  
 
 `soco_gsas_parcel.csv` is a tabular form of the spatial database without polygon geometries. As before, all 3 GSAs are represented and each row corresponds to a distinct parcel (APN).  
+
+`ddw_muni_pumping.csv` is a sheet that shows average annual groundwater pumping per water system in Sonoma County from 2013-2019.  
+
+`ddw_muni_pumping_audit.csv` is a sheet that shows reported Department of Drinking Water (DDW) average annual groundwater pumping per water system from 2013-2019.  
+
+`ddw_muni_pumping_summary.csv` is a summarized version of the sheet above and aggregates muni pumping at the basin scale. 
+
+`ddw_muni_missing.csv` shows all pwsid and names for systems that are attached to parcels in the database, but that do not have muni pumping data in DDW.  

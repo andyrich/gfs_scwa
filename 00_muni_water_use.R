@@ -6,7 +6,9 @@ library(sf)
 # ddw reported data
 l <- fs::dir_ls(path(data_path, "general/pws_water_use"), glob = "*.csv") %>% 
   map(~read_tsv(.x) %>% 
-        select(pwsid = PWSID, unit = `WP Units of Measure`, gw_af = `WP Annual GW`) %>% 
+        select(pwsid = PWSID, 
+               unit = `WP Units of Measure`, 
+               gw_af = `WP Annual GW`) %>% 
         # convert gallons and million gallons to acre-feet
         filter(unit %in% c("AF","G","MG")) %>% 
         mutate(gw_af = case_when(
@@ -28,13 +30,13 @@ dw <- all$CA_DrinkingWater_SvcArea_Name %>% unique()
 
 # pwsids of systems we need data for
 pwsid_key <- path(data_path, "general", "water_system_boundaries",
-            "SABL_Public_083121/SABL_Public_083121.shp") %>%
+                  "SABL_Public_083121/SABL_Public_083121.shp") %>%
   st_read() %>%
   st_drop_geometry() %>% 
   filter(WATER_SY_1 %in% dw) %>% 
   select(name = WATER_SY_1, pwsid = SABL_PWSID)
 
-# calcualte average annual gw use from 2013-2019
+# calculate average annual gw use from 2013-2019
 muni_gw <- d %>%
   left_join(pwsid_key) %>% 
   filter(name %in% dw & !is.na(name)) %>% 
@@ -50,17 +52,52 @@ ddw_gw <- all %>%
   select(name = CA_DrinkingWater_SvcArea_Name, 
          gsa = GSA_Jurisdiction_Prelim) %>% 
   distinct() %>% 
-  right_join(muni_gw)
+  right_join(muni_gw) %>% 
+  arrange(desc(gw_af))
 
+# deduplicate - Cotati is mostly in SRP, so add it to that budget
+# and remove it from PET
 ddw_gw %>% 
-  write_csv(here("data_output/muni_use_audit.csv"))
+  count(name, sort = T) %>% 
+  filter(n > 1)
 
-ddw_gw %>% 
+ddw_gw <- ddw_gw %>% 
+  anti_join(
+    tibble(name = "COTATI, CITY OF",
+           gsa  = "Petaluma Valley")
+    ) %>% 
+  left_join(pwsid_key) %>% 
+  filter(gw_af > 0) %>% 
+  select(pwsid, everything())
+
+write_csv(ddw_gw, here("data_output/ddw_muni_pumping.csv"))
+
+
+# per GSP muni totals to add ----------------------------------------------
+
+ddw_muni_pumping <- ddw_gw %>% 
   group_by(gsa) %>% 
   summarise(sum_gw_af = sum(gw_af)) %>% 
   ungroup()
 
-# missing water systems
-tibble(name = dw[! dw %in% muni_gw$name]) %>% 
+write_csv(ddw_muni_pumping, here("data_output/ddw_muni_pumping_summary.csv"))
+
+
+# missing water systems ---------------------------------------------------
+
+muni_missing <- dw %>% 
+  paste(collapse = "; ") %>% 
+  str_split("; ") %>% 
+  unlist() %>% 
+  unique() %>% 
+  tibble(name = .) %>% 
   left_join(pwsid_key) %>% 
-  filter(!is.na(name))
+  filter(
+    ! name %in% muni_gw$name & 
+    !is.na(name) & 
+    name != "NA" & 
+    name != "NAPA, CITY OF"
+  ) %>% 
+  arrange(pwsid, name)
+
+write_csv(muni_missing, here("data_output/ddw_muni_missing.csv"))
