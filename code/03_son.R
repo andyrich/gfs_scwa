@@ -7,6 +7,8 @@ library(fs)
 library(tidylog, warn.conflicts = FALSE)
 library(mapview)
 
+source(here("code/setup.R"))
+
 # area of interest object to make helper functions work
 aoi = "pson"
 

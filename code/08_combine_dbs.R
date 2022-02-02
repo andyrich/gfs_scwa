@@ -3,6 +3,8 @@ library(sf)
 library(here)
 library(fs)
 
+source(here("code/setup.R"))
+
 # read complete DBs
 psrp <- read_rds(path(data_path, "data_output/srp_parcel_complete.rds"))
 pson <- read_rds(path(data_path, "data_output/son_parcel_complete.rds")) 

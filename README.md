@@ -10,8 +10,6 @@ Rate and fee study (gfs) for Sonoma county GSAs:
 
 Clone this repo. Open the `gfs.RProj` file.  
 
-Note that the project-level `.RProfile` automatically loads functions and stores environmental variables in `.Renviron` as objects in `.GlobalEnv`. View this file with `usethis::edit_r_profile(scope = "project")`.  
-
 Configure environmental variables. The easiest way to do this is from within RStudio with the `{usethis}` package. Enter `usethis::edit_r_environ(scope = "project")` to edit the project-level `.Renviron` file, then edit the file and save with:
 
 ```R
@@ -24,6 +22,18 @@ The `DATA_PATH` is where project data dependencies are stored on a synced Dropbo
 The `EPSG` is the projection used in this study that all spatial data are standardized to.  
 
 Restart `R` for changes to take effect.  
+
+
+## Running the pipeline
+
+The pipeline constructs the database for SRP, SON, and PET in that order, and then glues all data together into one massive file. To execute the pipeline:  
+
+```
+cd gfs/code
+bash run.sh
+```
+
+`run.sh` strings together the sequential steps that create the database.  
 
 
 ## Schema
