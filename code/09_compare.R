@@ -22,7 +22,7 @@ p <- df %>%
 
 dir_create(here("results"))
 ggsave(p, filename = here("results/compare_parcel_gwf.png"), 
-       height = 6, width = 4)
+       height = 4, width = 9)
 
 p2 <- df %>% 
   filter(use != "all") %>% 
@@ -36,4 +36,4 @@ p2 <- df %>%
   theme_grey(base_size = 13)
 
 ggsave(p2, filename = here("results/compare_parcel_gwf_by_use.png"), 
-       height = 6, width = 4)
+       height = 4, width = 9)
