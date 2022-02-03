@@ -7,7 +7,11 @@ library(fs)
 library(tidylog, warn.conflicts = FALSE)
 library(mapview)
 
-source(here("code/setup.R"))
+dir_ls(here("code/functions")) %>% walk(~source(.x))
+f_load_dotenv() 
+
+data_path <- Sys.getenv("DATA_PATH")
+epsg <- as.numeric(Sys.getenv("EPSG"))
 
 # area of interest object to make helper functions work
 aoi = "psrp"
@@ -761,3 +765,5 @@ f_verify_non_duplicates()
 
 psrp %>% 
   write_rds(path(data_path, "data_output/srp_parcel_complete.rds"))
+cat("Complete SRP.\n")
+

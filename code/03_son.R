@@ -7,7 +7,11 @@ library(fs)
 library(tidylog, warn.conflicts = FALSE)
 library(mapview)
 
-source(here("code/setup.R"))
+dir_ls(here("code/functions")) %>% walk(~source(.x))
+f_load_dotenv() 
+
+data_path <- Sys.getenv("DATA_PATH")
+epsg <- as.numeric(Sys.getenv("EPSG"))
 
 # area of interest object to make helper functions work
 aoi = "pson"
@@ -762,3 +766,4 @@ f_verify_non_duplicates()
 
 pson %>% 
   write_rds(path(data_path, "data_output/son_parcel_complete.rds"))
+cat("Complete SON.\n")
