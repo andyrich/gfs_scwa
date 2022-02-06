@@ -25,8 +25,8 @@ all %>%
   st_drop_geometry() %>% 
   write_csv(here("data_output/soco_gsas_parcel.csv"))
 
-gjson_out <- here("data_output/soco_gsas_parcel.geojson")
-shp_out   <- here("data_output/soco_gsas_parcel.shp")
+gjson_out <- path(data_path, "data_output/soco_gsas_parcel.geojson")
+shp_out   <- path(data_path, "data_output/soco_gsas_parcel.shp")
 
 if(file_exists(gjson_out)) file_delete(gjson_out)
 st_write(all, gjson_out)
