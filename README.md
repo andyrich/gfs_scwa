@@ -1,10 +1,13 @@
 # gfs
 
-Rate and fee study (gfs) for Sonoma county GSAs: 
+LWA is prime to SCI on a **G**SA **F**ee and rate **S**tudy (gfs) for Sonoma County GSAs: 
 
-* Sonoma Valley  
 * Santa Rosa Plain  
-* Petaluma  
+* Sonoma Valley  
+* Petaluma Valley  
+
+This repo generates the parcel database of 93 fields (including geometry) for each GSA.  
+
 
 ## Getting started
 
@@ -33,7 +36,7 @@ cd gfs/code
 bash run.sh
 ```
 
-`run.sh` strings together the sequential steps that create the database.  
+`run.sh` strings together the sequential steps that create the database. Inspect it to see the 4 scripts it calls in order.  
 
 
 ## Schema
@@ -46,4 +49,4 @@ For methods, see `docs/memo.docx`.
 
 ***
 
-Last updated by *Rich Pauloo* on 2021-12-15.  
+Last updated by *Rich Pauloo* on 2022-02-08.  

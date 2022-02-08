@@ -104,13 +104,13 @@ crop_area <- crop %>%
   st_drop_geometry() %>% 
   group_by(crop_class, Basin_Name) %>% 
   summarise(area_m2 = sum(area)) %>% 
-  ungroup() %>% 
+  ungroup() %>%   
+  # convert m2 to acres
+  mutate(area_acres = round(as.numeric(area_m2 * 0.000247105), 2)) %>% 
   select(Basin_Name, everything()) %>% 
   arrange(Basin_Name, crop_class)
 
 p2b <- crop_area %>% 
-  # convert m2 to acres
-  mutate(area_acres = as.numeric(area_m2 * 0.000247105)) %>% 
   ggplot(aes(fct_reorder(crop_class, area_acres), area_acres)) +
   geom_col(aes(fill = crop_class)) +
   scale_y_continuous(label = scales::comma) +
