@@ -3,12 +3,16 @@ library(fs)
 library(here)
 library(sf)
 
+data_path <- Sys.getenv("DATA_PATH")
+
 # ddw reported data
 l <- fs::dir_ls(path(data_path, "general/pws_water_use"), glob = "*.csv") %>% 
   map(~read_tsv(.x) %>% 
+        mutate(year = str_remove_all(basename(.x), "EAR|LWS.csv|SWS.csv")) %>% 
         select(pwsid = PWSID, 
                unit = `WP Units of Measure`, 
-               gw_af = `WP Annual GW`) %>% 
+               gw_af = `WP Annual GW`,
+               year) %>% 
         # convert gallons and million gallons to acre-feet
         filter(unit %in% c("AF","G","MG")) %>% 
         mutate(gw_af = case_when(
@@ -35,6 +39,15 @@ pwsid_key <- path(data_path, "general", "water_system_boundaries",
   st_drop_geometry() %>% 
   filter(WATER_SY_1 %in% dw) %>% 
   select(name = WATER_SY_1, pwsid = SABL_PWSID)
+
+# full gw use (all years) for appendix C
+d %>% 
+  left_join(pwsid_key) %>% 
+  filter(name %in% dw & !is.na(name)) %>% 
+  # incorrect units create errors for two entries - remove them
+  filter(gw_af < 11000) %>% 
+  select(-unit) %>% 
+  write_csv(here("data_output/ddw_muni_pumping_all_years.csv"))
 
 # calculate average annual gw use from 2013-2019
 muni_gw <- d %>%
