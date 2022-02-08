@@ -63,6 +63,7 @@ ggsave(here("results/01_study_area.png"), p1, width = 7, height = 5)
 
 # figure 2: crop map ------------------------------------------------------
 
+# DWR crop data
 crop <- path(data_path, "general/crops/i15_Crop_Mapping_2018.shp") %>% 
   st_read() %>% 
   filter(COUNTY == "Sonoma") %>% 
@@ -80,6 +81,7 @@ crop <- path(data_path, "general/crops/i15_Crop_Mapping_2018.shp") %>%
     TRUE ~ "Other"
   ))
 
+# map of crops
 p2a <- ggplot() +
   geom_sf(data = srp, alpha = 0.5, inherit.aes = FALSE, fill = "white") +
   geom_sf(data = son, alpha = 0.5, inherit.aes = FALSE, fill = "white") +
@@ -94,15 +96,20 @@ p2a <- ggplot() +
   
 p2a
 
+# calculate crop areas
 crop_area <- crop %>% 
+  st_join(select(bind_rows(son, pet, srp), Basin_Name)) %>% 
   rmapshaper::ms_simplify(keep_shapes = TRUE) %>% 
   mutate(area = st_area(geometry)) %>% 
   st_drop_geometry() %>% 
-  group_by(crop_class) %>% 
+  group_by(crop_class, Basin_Name) %>% 
   summarise(area_m2 = sum(area)) %>% 
-  ungroup()
+  ungroup() %>% 
+  select(Basin_Name, everything()) %>% 
+  arrange(Basin_Name, crop_class)
 
 p2b <- crop_area %>% 
+  # convert m2 to acres
   mutate(area_acres = as.numeric(area_m2 * 0.000247105)) %>% 
   ggplot(aes(fct_reorder(crop_class, area_acres), area_acres)) +
   geom_col(aes(fill = crop_class)) +
