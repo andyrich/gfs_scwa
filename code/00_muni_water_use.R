@@ -41,20 +41,19 @@ pwsid_key <- path(data_path, "general", "water_system_boundaries",
   select(name = WATER_SY_1, pwsid = SABL_PWSID)
 
 # full gw use (all years) for appendix C
-d %>% 
+d <- d %>% 
   left_join(pwsid_key) %>% 
   filter(name %in% dw & !is.na(name)) %>% 
   # incorrect units create errors for two entries - remove them
   filter(gw_af < 11000) %>% 
-  select(-unit) %>% 
-  write_csv(here("data_output/ddw_muni_pumping_all_years.csv"))
+  # Windsor only has one well, so we correct to Raftelis' 50 AF/yr
+  mutate(gw_af = ifelse(name == "WINDSOR, TOWN OF", 50, gw_af)) %>% 
+  select(-unit) 
+  
+write_csv(d, here("data_output/ddw_muni_pumping_all_years.csv"))
 
 # calculate average annual gw use from 2013-2019
 muni_gw <- d %>%
-  left_join(pwsid_key) %>% 
-  filter(name %in% dw & !is.na(name)) %>% 
-  # incorrect units create errors for two entries - remove them
-  filter(gw_af < 11000) %>% 
   group_by(name) %>% 
   summarise(gw_af = mean(gw_af)) %>% 
   ungroup() 
@@ -74,6 +73,7 @@ ddw_gw %>%
   count(name, sort = T) %>% 
   filter(n > 1)
 
+# remove Cotati upon request from Permit Sonoma
 ddw_gw <- ddw_gw %>% 
   anti_join(
     tibble(name = "COTATI, CITY OF",
