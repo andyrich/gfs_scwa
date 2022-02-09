@@ -1,0 +1,701 @@
+---
+title: "Sonoma County basins, sanity check"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+Last generated: `r Sys.time()`. <br>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, out.width = "100%")
+
+library(tidyverse)
+library(sf)
+library(here)
+library(fs)
+library(mapview)
+library(patchwork)
+
+data_path="~/Dropbox (LWA)/data/sonoma_co_gsas_rate_fee"
+fs::dir_ls("~/Documents/Github/gfs/code/functions") %>% 
+  purrr::map(~source(.x))
+epsg = 3310
+
+# GSA spatial data
+b118_path <- path(data_path, "general/b118/i08_B118_v6-1.shp") 
+
+# gsa spatial data: petaluma, sonoma valley, santa rosa plain
+son <- f_load_b118_basin(b118_path, "NAPA-SONOMA VALLEY - SONOMA VALLEY")
+pet <- f_load_b118_basin(b118_path, "PETALUMA VALLEY")
+srp <- f_load_b118_basin(b118_path, "SANTA ROSA VALLEY - SANTA ROSA PLAIN")
+
+# borders for mapview
+son_border <- st_cast(son, "MULTILINESTRING")
+pet_border <- st_cast(pet, "MULTILINESTRING")
+srp_border <- st_cast(srp, "MULTILINESTRING")
+
+# groundwater budgets from groundwater flow models
+# pumping per user based on models, postprocessed by 01_avg_annual...R, 
+pump <- path(data_path, "tables/pump.csv") %>% 
+  read_csv()
+
+# SRP parcel database
+srp_use_ag  <- c("Dry Farm", "Irrigated Farm")
+srp_use_mid <- c("Recreational","Institutional","Miscellaneous","Industrial",
+                 "Government","Commercial","Residential")
+psrp <- read_rds(path(data_path, "data_output/srp_parcel_complete.rds")) %>% 
+  mutate(
+    # clean up and sort out use codes
+    UseCode_Category = str_remove_all(UseCode_Category, " Properties"),
+    type = case_when(
+      UseCode_Category %in% srp_use_ag ~ "agriculture",
+      UseCode_Category %in% srp_use_mid ~ "M&I plus domestic", 
+      TRUE ~ UseCode_Category),
+    basin = "Santa Rosa Plain")
+
+# SON parcel database
+pson <- read_rds(path(data_path, "data_output/son_parcel_complete.rds")) %>% 
+  mutate(
+    type = ifelse(
+      UseCode_Category != "Agricultural" | is.na(UseCode_Category), 
+      "M&I plus domestic", "agriculture"),
+    basin = "Sonoma Valley")
+
+# PET parcel database
+ppet <- read_rds(path(data_path, "data_output/pet_parcel_complete.rds")) %>% 
+  mutate(
+    type = case_when(
+      UseCode_Category == "Agricultural" ~ "agriculture",
+      UseCode_Category %in% c("Commercial", "MultiFamily", "Residential") ~ "M&I plus domestic", 
+      TRUE ~ UseCode_Category),
+    basin = "Petaluma Valley")
+```
+
+# Rebucketizing
+
+Grouped summary statistics are used to scope the relative contribution of different user groups (i.e., agriculture, M&I, domestic) to the overall groundwater budget. Each grouped summary can be though of as a "bucket", which although simple, may inadvertently combine water uses. For example, we may summarize by `UseCodeCategory`, but a parcel labeled "Commercial" may actually contain agricultural acreage and exhibit predominately agricultural water use. 
+
+Here, we experiment with different ways to group and summarize estimated groundwater pumping across parcels (e.g., "rebucketize"). Three approaches are demonstrated: 
+
+1. **usecode**: group by `UseCodeCategory`  
+2. **raw 1**: group by sub-parcel groundwater uses (e.g., `Res_GW_Use`, `Commercial_GW_Use`, `Ag_GW_Use`)  
+3. **raw 2**: same as raw 1 above, but all parcels with an "agriculture" `UseCodeCategory` absorb Residential and Commercial uses  
+
+A bucket based on the proportion of agricultural acreage per parcel, where parcels with >= 50% of land area filled with crops were reclassified as "agriculture" was tried but did not produce reasonable results.
+
+
+### usecode bucket
+
+```{r}
+srp_usecode_bucket <- psrp %>% 
+  st_drop_geometry() %>% 
+  group_by(type) %>% 
+  summarise(pumpage_af = sum(Total_Groundwater_Use_Ac_Ft, 
+                             na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  arrange(desc(pumpage_af)) %>% 
+  filter(!is.na(type))
+
+son_usecode_bucket <- pson %>% 
+  st_drop_geometry() %>% 
+  group_by(type) %>% 
+  summarise(pumpage_af = sum(Total_Groundwater_Use_Ac_Ft, 
+                             na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  arrange(desc(pumpage_af))
+
+pet_usecode_bucket <- ppet %>% 
+  st_drop_geometry() %>% 
+  group_by(type) %>% 
+  summarise(pumpage_af = sum(Total_Groundwater_Use_Ac_Ft, 
+                             na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  arrange(desc(pumpage_af)) %>% 
+  filter(!is.na(type))
+
+# results from bucket usecode
+srp_usecode_bucket
+son_usecode_bucket
+pet_usecode_bucket
+```
+
+### raw 1 bucket
+
+Next, buckets based on raw water use:
+
+```{r}
+srp_raw_bucket <- psrp %>% 
+  st_drop_geometry() %>% 
+  summarise(
+    agriculture = sum(Ag_GW_Use_Ac_Ft),
+    residential = sum(Res_GW_Use_Ac_Ft),
+    commercial  = sum(Commercial_GW_Use_Ac_Ft),
+    school_golf = sum(School_Golf_GW_Use_Ac_Ft),
+    urban_irrigation = sum(Urban_Irrigation_GW_Use_Ac_Ft)
+  ) %>% 
+  mutate(
+    agriculture = agriculture + school_golf,
+    `M&I plus domestic` = residential + commercial + urban_irrigation,
+    total = agriculture + `M&I plus domestic`
+  )
+
+son_raw_bucket <- pson %>% 
+  st_drop_geometry() %>% 
+  summarise(
+    agriculture = sum(Ag_GW_Use_Ac_Ft),
+    residential = sum(Res_GW_Use_Ac_Ft),
+    commercial  = sum(Commercial_GW_Use_Ac_Ft),
+    school_golf = sum(School_Golf_GW_Use_Ac_Ft),
+    urban_irrigation = sum(Urban_Irrigation_GW_Use_Ac_Ft)
+  ) %>% 
+  mutate(
+    agriculture = agriculture + school_golf,
+    `M&I plus domestic` = residential + commercial + urban_irrigation,
+    total = agriculture + `M&I plus domestic`
+  )
+
+pet_raw_bucket <- ppet %>% 
+  st_drop_geometry() %>% 
+  summarise(
+    agriculture = sum(Ag_GW_Use_Ac_Ft),
+    residential = sum(Res_GW_Use_Ac_Ft),
+    commercial  = sum(Commercial_GW_Use_Ac_Ft),
+    school_golf = sum(School_Golf_GW_Use_Ac_Ft),
+    urban_irrigation = sum(Urban_Irrigation_GW_Use_Ac_Ft)
+  ) %>% 
+  mutate(
+    agriculture = agriculture + school_golf,
+    `M&I plus domestic` = commercial + urban_irrigation + residential,
+    total = agriculture + `M&I plus domestic`
+  )
+
+# results from bucket raw 1
+srp_raw_bucket1 <- srp_raw_bucket %>% 
+  select(agriculture, `M&I plus domestic`) %>%
+  pivot_longer(everything(), names_to = "type", values_to = "pumpage_af")
+
+son_raw_bucket1 <- son_raw_bucket %>% 
+  select(agriculture, `M&I plus domestic`) %>%
+  pivot_longer(everything(), names_to = "type", values_to = "pumpage_af")
+
+pet_raw_bucket1 <- pet_raw_bucket %>% 
+  select(agriculture, `M&I plus domestic`) %>%
+  pivot_longer(everything(), names_to = "type", values_to = "pumpage_af")
+
+# print
+srp_raw_bucket1
+son_raw_bucket1
+pet_raw_bucket1
+```
+
+
+### raw 2 bucket
+
+Finally, buckets based on raw water use where non-zero commercial and residential water uses on "Ag" Accessor use land are reclassified as Ag water uses. 
+
+```{r}
+srp_raw_bucket2 <- psrp %>% 
+  st_drop_geometry() %>% 
+  mutate(
+    Ag_GW_Use_Ac_Ft = ifelse(
+      type == "agriculture", 
+      Ag_GW_Use_Ac_Ft + Res_GW_Use_Ac_Ft + Commercial_GW_Use_Ac_Ft, 
+      Ag_GW_Use_Ac_Ft),
+    Res_GW_Use_Ac_Ft = ifelse(
+      type == "agriculture", 
+      0, 
+      Res_GW_Use_Ac_Ft),
+    Commercial_GW_Use_Ac_Ft = ifelse(
+      type == "agriculture", 
+      0, 
+      Commercial_GW_Use_Ac_Ft)
+  ) %>% 
+  summarise(
+    agriculture = sum(Ag_GW_Use_Ac_Ft),
+    residential = sum(Res_GW_Use_Ac_Ft),
+    commercial  = sum(Commercial_GW_Use_Ac_Ft),
+    school_golf = sum(School_Golf_GW_Use_Ac_Ft),
+    urban_irrigation = sum(Urban_Irrigation_GW_Use_Ac_Ft)
+  ) %>% 
+  mutate(
+    agriculture = agriculture + school_golf,
+    `M&I plus domestic` = residential + commercial + urban_irrigation,
+    total = agriculture + `M&I plus domestic`
+  )
+
+son_raw_bucket2 <- pson %>% 
+  st_drop_geometry() %>% 
+  mutate(
+    Ag_GW_Use_Ac_Ft = ifelse(
+      type == "agriculture", 
+      Ag_GW_Use_Ac_Ft + Res_GW_Use_Ac_Ft + Commercial_GW_Use_Ac_Ft, 
+      Ag_GW_Use_Ac_Ft),
+    Res_GW_Use_Ac_Ft = ifelse(
+      type == "agriculture", 
+      0, 
+      Res_GW_Use_Ac_Ft),
+    Commercial_GW_Use_Ac_Ft = ifelse(
+      type == "agriculture", 
+      0, 
+      Commercial_GW_Use_Ac_Ft)
+  ) %>% 
+  summarise(
+    agriculture = sum(Ag_GW_Use_Ac_Ft),
+    residential = sum(Res_GW_Use_Ac_Ft),
+    commercial  = sum(Commercial_GW_Use_Ac_Ft),
+    school_golf = sum(School_Golf_GW_Use_Ac_Ft),
+    urban_irrigation = sum(Urban_Irrigation_GW_Use_Ac_Ft)
+  ) %>% 
+  mutate(
+    agriculture = agriculture + school_golf,
+    `M&I plus domestic` = residential + commercial + urban_irrigation,
+    total = agriculture + `M&I plus domestic`
+  )
+
+pet_raw_bucket2 <- ppet %>% 
+  st_drop_geometry() %>% 
+  mutate(
+    Ag_GW_Use_Ac_Ft = ifelse(
+      type == "agriculture", 
+      Ag_GW_Use_Ac_Ft + Res_GW_Use_Ac_Ft + Commercial_GW_Use_Ac_Ft, 
+      Ag_GW_Use_Ac_Ft),
+    Res_GW_Use_Ac_Ft = ifelse(
+      type == "agriculture", 
+      0, 
+      Res_GW_Use_Ac_Ft),
+    Commercial_GW_Use_Ac_Ft = ifelse(
+      type == "agriculture", 
+      0, 
+      Commercial_GW_Use_Ac_Ft)
+  ) %>% 
+  summarise(
+    agriculture = sum(Ag_GW_Use_Ac_Ft, na.rm = TRUE),
+    residential = sum(Res_GW_Use_Ac_Ft, na.rm = TRUE),
+    commercial  = sum(Commercial_GW_Use_Ac_Ft, na.rm = TRUE),
+    school_golf = sum(School_Golf_GW_Use_Ac_Ft, na.rm = TRUE),
+    urban_irrigation = sum(Urban_Irrigation_GW_Use_Ac_Ft, na.rm = TRUE)
+  ) %>% 
+  mutate(
+    agriculture = agriculture + school_golf,
+    `M&I plus domestic` = commercial + urban_irrigation + residential,
+    total = agriculture + `M&I plus domestic`
+  )
+
+# results from bucket raw 2
+srp_raw_bucket2 <- srp_raw_bucket2 %>% 
+  select(agriculture, `M&I plus domestic`) %>%
+  pivot_longer(everything(), names_to = "type", values_to = "pumpage_af")
+
+son_raw_bucket2 <- son_raw_bucket2 %>% 
+  select(agriculture, `M&I plus domestic`) %>%
+  pivot_longer(everything(), names_to = "type", values_to = "pumpage_af")
+
+pet_raw_bucket2 <- pet_raw_bucket2 %>% 
+  select(agriculture, `M&I plus domestic`) %>%
+  pivot_longer(everything(), names_to = "type", values_to = "pumpage_af")
+
+# print
+srp_raw_bucket2
+son_raw_bucket2
+pet_raw_bucket2
+```
+
+
+```{r, eval = FALSE}
+# Buckets based on proportion of ag land, where >= 50% ag is reclassified as "ag" were tried but don't work well.
+pson %>% 
+  st_drop_geometry() %>% 
+  mutate(is_ag = ifelse(
+    (Total_Crop_Area_Ac / LandSizeAcres) >= 0.5, TRUE, FALSE)) %>% 
+  group_by(is_ag) %>% 
+  summarise(gw_use = sum(Total_Groundwater_Use_Ac_Ft))
+  
+ppet %>% 
+  st_drop_geometry() %>% 
+  mutate(is_ag = ifelse(
+    (Total_Crop_Area_Ac / LandSizeAcres) >= 0.50, TRUE, FALSE)) %>% 
+  group_by(is_ag) %>% 
+  summarise(gw_use = sum(Total_Groundwater_Use_Ac_Ft))
+```
+
+
+# Compare groundwater flow and parcel models
+
+Now we compare the results of the three buckets above to groundwater pumping estimates from the groundwater flow model. 
+
+```{r}
+# groundwater model results
+gwm <- tribble(
+    ~basin, ~type,               ~pump_gwm, ~pump_min, ~pump_max, 
+    "SRP",  "agriculture",       10400,      8700,      11400,
+    "SRP",  "M&I plus domestic", 9500,       7300,      11200,
+    "SON",  "agriculture",       3800,       3100,      4300,
+    "SON",  "M&I plus domestic", 1900,       1400,      2000,
+    "PET",  "agriculture",       2000,       1900,      2150,
+    "PET",  "M&I plus domestic", 500,        300,       700) 
+
+b0 <- bind_rows(srp_usecode_bucket, son_usecode_bucket, pet_usecode_bucket) %>% 
+  mutate(basin = c("SRP", "SRP", "SON", "SON", "PET", "PET")) %>% 
+  rename(pump_parcel = pumpage_af)
+b1 <- bind_rows(srp_raw_bucket1, son_raw_bucket1, pet_raw_bucket1) %>% 
+  mutate(basin = c("SRP", "SRP", "SON", "SON", "PET", "PET")) %>% 
+  rename(pump_parcel = pumpage_af)
+b2 <- bind_rows(srp_raw_bucket2, son_raw_bucket2, pet_raw_bucket2) %>% 
+  mutate(basin = c("SRP", "SRP", "SON", "SON", "PET", "PET")) %>% 
+  rename(pump_parcel = pumpage_af)
+
+left_join(gwm, b0, by = c("basin", "type")) %>% 
+  ggplot(aes(pump_parcel, pump_gwm, color = type)) + 
+  geom_point(alpha = 0.8) + 
+  geom_abline(slope = 1, linetype = "dashed", color = "red") + 
+  coord_cartesian(xlim = c(0, 10500), ylim = c(0, 10500)) +
+  rcartocolor::scale_color_carto_d(palette = "Earth") + 
+  labs(x = "Annual GW pumping (parcel)",
+       y = "Annual GW pumping (groundwater flow model)",
+       subtitle = "Water budget comparison (AF/year)",
+       title = "Parcel UseCode Bucket",
+       color = "Use Code Category") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+
+left_join(gwm, b1, by = c("basin", "type")) %>% 
+  ggplot(aes(pump_parcel, pump_gwm, color = type)) + 
+  geom_point(alpha = 0.8) + 
+  geom_abline(slope = 1, linetype = "dashed", color = "red") + 
+  coord_cartesian(xlim = c(0, 10500), ylim = c(0, 10500)) +
+  rcartocolor::scale_color_carto_d(palette = "Earth") + 
+  labs(x = "Annual GW pumping (parcel)",
+       y = "Annual GW pumping (groundwater flow model)",
+       subtitle = "Water budget comparison (AF/year)",
+       title = "Parcel Raw Bucket 1",
+       color = "Use Code Category") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+
+left_join(gwm, b2, by = c("basin", "type")) %>% 
+  ggplot(aes(pump_parcel, pump_gwm, color = type)) + 
+  geom_point(alpha = 0.8) + 
+  geom_abline(slope = 1, linetype = "dashed", color = "red") + 
+  coord_cartesian(xlim = c(0, 10500), ylim = c(0, 10500)) +
+  rcartocolor::scale_color_carto_d(palette = "Earth") + 
+  labs(x = "Annual GW pumping (parcel)",
+       y = "Annual GW pumping (groundwater flow model)",
+       subtitle = "Water budget comparison (AF/year)",
+       title = "Parcel Raw Bucket 2",
+       color = "Use Code Category") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+```
+
+
+
+# Crop acres per basin and water use
+
+Next, we summarize crop acres per basin and consumptive demand to compare with groundwater flow models. Importantly, because a parcel may have multiple crops and multiple sources of surface and recycled water in addition to groundwater, reported demands are not adjusted for the actual groundwater consumed per crop. Hence, results should be interpreted as the total crop water demand per crop. 
+
+This calculation is most important for PET [& SRP], where parcel-estimated agricultural water use is below average modeled agricultural groundwater use by around 600-700 AF/yr. 
+
+### SRP
+
+```{r}
+psrp_crop_acres <- psrp %>% 
+  st_drop_geometry() %>% 
+  summarise(
+    across(contains("Area_Ac"), ~sum(.x))
+  ) %>% 
+  pivot_longer(everything(), names_to = "crop", values_to = "acres") %>% 
+  mutate(crop = str_remove_all(crop, "_Area_Ac"))
+
+psrp_crop_demand <- psrp %>% 
+  st_drop_geometry() %>% 
+  summarise(
+    across(contains("_Rate"), ~sum(.x))
+  ) %>% 
+  pivot_longer(everything(), names_to = "name", values_to = "AF_yr")
+
+# reshuffling needed for SRP
+psrp_crop_demand <- bind_rows(slice(psrp_crop_demand, 2:10),
+                              slice(psrp_crop_demand, 1))
+
+bind_cols(psrp_crop_acres, psrp_crop_demand) %>% 
+  select(-name) %>% 
+  mutate(across(all_of(c("acres", "AF_yr")), ~round(.x, 0))) %>% 
+  arrange(desc(AF_yr)) %>% 
+  DT::datatable(rownames = FALSE)
+```
+
+### SON
+
+```{r}
+pson_crop_acres <- pson %>% 
+  st_drop_geometry() %>% 
+  summarise(
+    across(contains("Area_Ac"), ~sum(.x))
+  ) %>% 
+  pivot_longer(everything(), names_to = "crop", values_to = "acres") %>% 
+  mutate(crop = str_remove_all(crop, "_Area_Ac"))
+
+pson_crop_demand <- pson %>% 
+  st_drop_geometry() %>% 
+  summarise(
+    across(contains("_Rate"), ~sum(.x))
+  ) %>% 
+  pivot_longer(everything(), names_to = "name", values_to = "AF_yr")
+
+bind_cols(pson_crop_acres, pson_crop_demand) %>% 
+  select(-name) %>% 
+  mutate(across(all_of(c("acres", "AF_yr")), ~round(.x, 0))) %>% 
+  arrange(desc(AF_yr)) %>% 
+  DT::datatable(rownames = FALSE)
+```
+
+### PET
+
+```{r}
+ppet_crop_acres <- ppet %>% 
+  st_drop_geometry() %>% 
+  summarise(
+    across(contains("Area_Ac"), ~sum(.x))
+  ) %>% 
+  pivot_longer(everything(), names_to = "crop", values_to = "acres") %>% 
+  mutate(crop = str_remove_all(crop, "_Area_Ac"))
+
+ppet_crop_demand <- ppet %>% 
+  st_drop_geometry() %>% 
+  summarise(
+    across(contains("_Rate"), ~sum(.x))
+  ) %>% 
+  pivot_longer(everything(), names_to = "name", values_to = "AF_yr")
+
+bind_cols(ppet_crop_acres, ppet_crop_demand) %>% 
+  select(-name) %>% 
+  mutate(across(all_of(c("acres", "AF_yr")), ~round(.x, 0))) %>% 
+  arrange(desc(AF_yr)) %>% 
+  DT::datatable(rownames = FALSE)
+```
+
+
+# Rural residential parcels
+
+Across the 3 GSAs, we provide the count and location of rural residential parcels non-zero Residential GW Use.
+
+## SRP
+
+SRP groups domestic and M&I uses, and all 3 parcel models estimate lower groundwater than the groundwater flow model: `r nrow(filter(psrp, Res_GW_Use_Ac_Ft > 0))` parcels with non-zero Residential water use (from Accessor codes) contribute to the `r round(sum(psrp$Res_GW_Use_Ac_Ft), 0)` AF (calculated via raw 1) of domestic groundwater use. 
+
+```{r}
+psrp %>% 
+  filter(Res_GW_Use_Ac_Ft > 0) %>% 
+  mapview(zcol = "Res_GW_Use_Ac_Ft") + 
+  mapview(srp_border)
+
+# sum of water use according to raw 1 approach (AF)
+sum(psrp$Res_GW_Use_Ac_Ft) 
+```
+
+## SON
+
+SON groups domestic and M&I uses, and all 3 parcel models estimate lower groundwater than the groundwater flow model: `r nrow(filter(pson, Res_GW_Use_Ac_Ft > 0))` parcels with non-zero Residential water use (from Accessor codes) contribute to the `r round(sum(pson$Res_GW_Use_Ac_Ft), 0)` AF (calculated via raw 1) of domestic groundwater use. 
+
+```{r}
+pson %>% 
+  filter(Res_GW_Use_Ac_Ft > 0) %>% 
+  mapview(zcol = "Res_GW_Use_Ac_Ft") + 
+  mapview(son_border)
+
+# sum of water use according to raw 1 approach (AF)
+sum(pson$Res_GW_Use_Ac_Ft) 
+```
+
+## PET
+
+All 3 parcel bucket models exhibit larger domestic use than the groundwater flow model: `r nrow(filter(ppet, Res_GW_Use_Ac_Ft > 0))` parcels with non-zero Residential water use (from Accessor codes) contribute to the `r round(sum(ppet$Res_GW_Use_Ac_Ft), 0)` AF (calculated via raw 1) of domestic groundwater use. 
+
+```{r}
+ppet %>% 
+  filter(Res_GW_Use_Ac_Ft > 0) %>% 
+  mapview(zcol = "Res_GW_Use_Ac_Ft") + 
+  mapview(pet_border)
+
+# sum of water use according to raw 1 approach (AF)
+sum(ppet$Res_GW_Use_Ac_Ft) 
+```
+
+
+# Public water supply systems and water uses
+
+Water system connections are captured for the major water service system areas. A fundamental assumption in the parcel water balance model is that a parcel with a public service connection obtains water from that system. Parcels without a connection obtain their estimated water (via Accessor Codes) from groundwater. 
+
+We summarize estimated residential and commercial water use grouped by drinking water service area. Be careful not to interpret this as groundwater use -- rather, it is the water delivered by the system.
+
+
+### SRP
+
+Top 10 water systems:
+
+```{r}
+# what water systems *should* we have water use data for?
+psrp %>% 
+  st_drop_geometry() %>% 
+  filter(!is.na(CA_DrinkingWater_SvcArea_Name)) %>% 
+  count(CA_DrinkingWater_SvcArea_Name, sort = TRUE, name = "n_parcels") %>% 
+  DT::datatable(rownames = FALSE)
+```
+
+Residential and Commercial Water Use (raw 1):
+
+```{r}
+# res and commercial water use
+wsu_srp <- psrp %>% 
+  st_drop_geometry() %>% 
+  filter(Public_Water_Connection == "Yes", 
+         CA_DrinkingWater_SvcArea_Name != "Not In Public Water System") %>% 
+  group_by(CA_DrinkingWater_SvcArea_Name) %>%
+  summarise(res_use_af = sum(Res_W_Use_Assessor_Ac_Ft, na.rm = TRUE),
+            com_use_af = sum(Commercial_W_Use_Assessor_Ac_Ft, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(total_use_af = res_use_af + com_use_af)
+
+wsu_srp %>% 
+  # arrange(desc(res_use_af, com_use_af)) %>% 
+  arrange(desc(sum_gw_af)) %>% 
+  DT::datatable(rownames = FALSE)
+```
+
+
+## SON
+
+Top 10 water systems:
+
+```{r}
+# what water systems *should* we have water use data for?
+pson %>% 
+  st_drop_geometry() %>% 
+  count(CA_DrinkingWater_SvcArea_Name, sort = TRUE) %>% 
+  DT::datatable(rownames = FALSE)
+```
+
+Residential and Commercial Water Use (raw 1):
+
+```{r}
+# res and commercial water use
+wsu_son <- pson %>% 
+  st_drop_geometry() %>% 
+  filter(Public_Water_Connection == "Yes",
+         !is.na(CA_DrinkingWater_SvcArea_Name)) %>%
+  group_by(CA_DrinkingWater_SvcArea_Name) %>% 
+  summarise(res_use_af = sum(Res_W_Use_Assessor_Ac_Ft, na.rm = TRUE),
+            com_use_af = sum(Commercial_W_Use_Assessor_Ac_Ft, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(total_use_af = res_use_af + com_use_af)
+
+wsu_son %>% 
+  arrange(desc(res_use_af, com_use_af)) %>% 
+  DT::datatable(rownames = FALSE)
+```
+
+
+## PET
+
+Top 10 water systems:
+
+```{r}
+# what water systems *should* we have water use data for?
+ppet %>% 
+  st_drop_geometry() %>% 
+  count(CA_DrinkingWater_SvcArea_Name, sort = TRUE) %>% 
+  DT::datatable(rownames = FALSE)
+```
+
+Residential and Commercial Water Use (raw 1):
+
+```{r}
+# res and commercial water use
+wsu_pet <- ppet %>% 
+  st_drop_geometry() %>% 
+  filter(Public_Water_Connection == "Yes",
+         !is.na(CA_DrinkingWater_SvcArea_Name)) %>%
+  group_by(CA_DrinkingWater_SvcArea_Name) %>% 
+  summarise(res_use_af = sum(Res_W_Use_Assessor_Ac_Ft, na.rm = TRUE),
+            com_use_af = sum(Commercial_W_Use_Assessor_Ac_Ft, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(total_use_af = res_use_af + com_use_af)
+
+wsu_pet %>% 
+  arrange(desc(res_use_af, com_use_af)) %>% 
+  DT::datatable(rownames = FALSE)
+```
+
+Combine model estimated water data (from Accessor rates and water system boundaries as calculated above) with data reported to the state water Board.
+
+```{r}
+# annual water use from the Water Board
+wu <- xlsx::read.xlsx(
+  path(data_path, "general/pws_water_use",
+       "2020 EAR Water Suppy and Deilvery data for Sonoma District PWS.xlsx"), 
+  sheetIndex = 1, colIndex = c(1, 7, 102)) %>% 
+  rename(pwsid = PwsID, unit = WPUnitsofMeasure, use = WPAnnualTotal) %>% 
+  mutate(
+    # convert all units to AF
+    board_use_af = case_when(
+      unit == "MG"  ~ use * 3.68558063,
+      unit == "G"   ~ use * 3.06889e-6,
+      unit == "CCF" ~ use * 0.00229569,
+      unit == "AF"  ~ use * 1),
+    unit = "AF"
+  ) %>% 
+  select(-use)
+
+# water service areas in California
+rm_pwsid <- c("CA2110003")
+wsa <- path(data_path, "general", "water_system_boundaries",
+            "SABL_Public_083121/SABL_Public_083121.shp") %>% 
+  st_read() %>% 
+  st_transform(epsg) %>% 
+  st_intersection(st_union(son, pet, srp)) %>% 
+  select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1,
+         pwsid = SABL_PWSID) %>% 
+  left_join(wu) %>%
+  filter(!is.na(board_use_af) & ! pwsid %in% rm_pwsid)
+
+# attach water use
+wu <- arrange(wsa, desc(board_use_af)) %>% 
+  left_join(bind_rows(wsu_srp, wsu_son, wsu_pet)) %>%
+  mutate(name = ifelse(
+    total_use_af > 500,
+    str_wrap(CA_DrinkingWater_SvcArea_Name, 13),
+    NA)
+  )
+  
+p1 <- wu %>% 
+  ggplot(aes(total_use_af, board_use_af, 
+             text = CA_DrinkingWater_SvcArea_Name)) + 
+  geom_point(alpha = 0.5) + 
+  geom_abline(slope = 1, linetype = "dashed") +
+  ggrepel::geom_label_repel(aes(label = name), size = 2,
+                            fill = "white", alpha = 1) + 
+  annotate("rect", xmin = -10, xmax = 100, ymin = -10, ymax = 100,
+           alpha = .1, color = "red") +
+  coord_cartesian(ylim = c(0, 4000), xlim = c(0, 4000)) +
+  scale_y_continuous(expand = c(0.01, 0.01)) +
+  scale_x_continuous(expand = c(0.01, 0.01)) +
+  labs(x = "Water use (Parcel)", y = "Water use (Board)",
+       title = "Comparison of Annual Water Use (AF)",
+       subtitle = "Parcel (estimated) and Water Board (reported)") +
+  cowplot::theme_cowplot()
+
+p2 <- wu %>% 
+  ggplot(aes(total_use_af, board_use_af)) + 
+  geom_point(alpha = 0.5) + 
+  geom_abline(slope = 1, linetype = "dashed") +
+  labs(x = "", y = "") +
+  coord_cartesian(ylim = c(0, 100), xlim = c(0, 100)) +
+  cowplot::theme_cowplot()  + 
+  theme(plot.background = element_rect(color = "red"), 
+        plot.margin = unit(c(10,10,-10,-10), units = "points"))
+
+p1 + inset_element(p2, 0.05, 0.6, 0.45, 1)
+plotly::ggplotly(p1, tooltip = c("text", "x", "y"))
+```
+
