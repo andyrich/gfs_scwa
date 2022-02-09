@@ -33,7 +33,8 @@ p2 <- df %>%
   facet_wrap(~use) + 
   labs(y = "Estimated Groundwater pumping (AF/year)", x = "") + 
   scale_y_continuous(label = scales::comma) +
-  theme_grey(base_size = 13)
+  theme_grey(base_size = 13) +
+  theme(panel.spacing = unit(1, "cm"))
 
 ggsave(p2, filename = here("results/compare_parcel_gwf_by_use.png"), 
        height = 4, width = 9)
