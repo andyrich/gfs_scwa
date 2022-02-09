@@ -2,11 +2,9 @@ library(tidyverse)
 library(sf)
 library(here)
 library(fs)
-library(mapview)
 library(patchwork)
 library(ggsflabel)
 library(ggmap)
-library(ggsn)
 
 # setup
 dir_ls(here("code/functions")) %>% walk(~source(.x))
@@ -65,6 +63,7 @@ ggsave(here("results/01_study_area.png"), p1, width = 7, height = 5)
 
 # figure 2: crop map ------------------------------------------------------
 
+# DWR crop data
 crop <- path(data_path, "general/crops/i15_Crop_Mapping_2018.shp") %>% 
   st_read() %>% 
   filter(COUNTY == "Sonoma") %>% 
@@ -82,30 +81,36 @@ crop <- path(data_path, "general/crops/i15_Crop_Mapping_2018.shp") %>%
     TRUE ~ "Other"
   ))
 
+# map of crops
 p2a <- ggplot() +
-  geom_sf(data = srp, alpha = 0.5, inherit.aes = FALSE) +
-  geom_sf(data = son, alpha = 0.5, inherit.aes = FALSE) +
-  geom_sf(data = pet, alpha = 0.5, inherit.aes = FALSE) +
+  geom_sf(data = srp, alpha = 0.5, inherit.aes = FALSE, fill = "white") +
+  geom_sf(data = son, alpha = 0.5, inherit.aes = FALSE, fill = "white") +
+  geom_sf(data = pet, alpha = 0.5, inherit.aes = FALSE, fill = "white") +
   geom_sf(data = crop, aes(fill = crop_class), lwd = 0,
           alpha = 0.8, inherit.aes = FALSE) +
   rcartocolor::scale_fill_carto_d(palette = "Pastel") +
   labs(fill = "Crop Class") +
   labs(x = "", y = "") +
   guides(fill = "none") + 
-  theme_void()  
+  theme_void()
   
 p2a
 
+# calculate crop areas
 crop_area <- crop %>% 
+  st_join(select(bind_rows(son, pet, srp), Basin_Name)) %>% 
   rmapshaper::ms_simplify(keep_shapes = TRUE) %>% 
   mutate(area = st_area(geometry)) %>% 
   st_drop_geometry() %>% 
-  group_by(crop_class) %>% 
+  group_by(crop_class, Basin_Name) %>% 
   summarise(area_m2 = sum(area)) %>% 
-  ungroup()
+  ungroup() %>%   
+  # convert m2 to acres
+  mutate(area_acres = round(as.numeric(area_m2 * 0.000247105), 2)) %>% 
+  select(Basin_Name, everything()) %>% 
+  arrange(Basin_Name, crop_class)
 
 p2b <- crop_area %>% 
-  mutate(area_acres = as.numeric(area_m2 * 0.000247105)) %>% 
   ggplot(aes(fct_reorder(crop_class, area_acres), area_acres)) +
   geom_col(aes(fill = crop_class)) +
   scale_y_continuous(label = scales::comma) +
@@ -113,11 +118,66 @@ p2b <- crop_area %>%
   rcartocolor::scale_fill_carto_d(palette = "Pastel") +
   labs(x = "", y = "Acres") +
   guides(fill = "none") + 
-  theme_minimal(base_size = 12) +
+  theme_minimal(base_size = 14) +
   theme(panel.grid.minor = element_blank())
 
 p2b 
 
-p2 <- p2b + p2a + plot_layout(widths = c(0.5, 0.5))
+p2 <- p2b + p2a + plot_layout(widths = c(0.3, 0.7))
 ggsave(here("results/02_crop_map.png"), p2, width = 11, height = 5)
 
+
+# figure 3: water service areas -------------------------------------------
+
+# water service areas in SON
+wsa <- path(data_path, "general", "water_system_boundaries",
+            "SABL_Public_083121/SABL_Public_083121.shp") %>% 
+  st_read() %>% 
+  st_transform(4269) %>% 
+  st_make_valid() %>% 
+  st_intersection(st_union(bind_rows(son, srp, pet))) %>% 
+  select(name  = WATER_SY_1,
+         pwsid = SABL_PWSID) %>% 
+  mutate(area = st_area(geometry))
+
+top_10_wsa <- wsa %>% slice_max(area, n = 10) %>% pull(name)
+
+# rewrite names for plotting so that only the top 10 show up
+wsa <- wsa %>% 
+  mutate(name = ifelse(name %in% top_10_wsa, name, "other"))
+
+p3a <- ggplot() +
+  geom_sf(data = srp, alpha = 0.5, inherit.aes = FALSE) +
+  geom_sf(data = son, alpha = 0.5, inherit.aes = FALSE) +
+  geom_sf(data = pet, alpha = 0.5, inherit.aes = FALSE) +
+  geom_sf(data = wsa, aes(fill = name), lwd = 0, 
+          alpha = 0.5, inherit.aes = FALSE) +
+  geom_sf_label_repel(data = filter(wsa, name != "other"), 
+                      aes(label = name, fill = name), alpha = 0.7) +
+  rcartocolor::scale_fill_carto_d(palette = "Bold") +
+  labs(x = "", y = "") +
+  guides(fill = "none") +
+  theme_void()  
+
+p3a
+
+ggsave(here("results/03_wsa.png"), p3a, width = 22, height = 10)
+
+
+# figure 4: parcel groundwater use ----------------------------------------
+
+breaks <- seq(0, 400, 50)
+
+p4 <- ggplot() +
+  geom_sf(data = srp, alpha = 0.5, inherit.aes = FALSE, fill = "white") +
+  geom_sf(data = son, alpha = 0.5, inherit.aes = FALSE, fill = "white") +
+  geom_sf(data = pet, alpha = 0.5, inherit.aes = FALSE, fill = "white") +
+  geom_sf(data = all, 
+          aes(fill = Total_Groundwater_Use_Ac_Ft), lwd = 0,
+          alpha = 0.8, inherit.aes = FALSE) +
+  rcartocolor::scale_fill_carto_c(palette = "Sunset") +
+  labs(fill = "Total Groundwater\nUse (AF/yr)") +
+  labs(x = "", y = "") +
+  theme_void()
+
+ggsave(here("results/04_gw_use_parcel.png"), p4, width = 11, height = 5)

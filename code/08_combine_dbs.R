@@ -23,10 +23,10 @@ all <- bind_rows(psrp, pson, ppet)
 # write to shp and csv
 all %>% 
   st_drop_geometry() %>% 
-  write_csv(here("data_output/soco_gsas_parcel.csv"))
+  write_csv(path(data_path, "data_output/soco_gsas_parcel.csv"))
 
 gjson_out <- path(data_path, "data_output/soco_gsas_parcel.geojson")
-shp_out   <- path(data_path, "data_output/soco_gsas_parcel.shp")
+shp_out   <- path(data_path, "data_output/shp/soco_gsas_parcel.shp")
 
 if(file_exists(gjson_out)) file_delete(gjson_out)
 st_write(all, gjson_out)
