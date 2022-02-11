@@ -5,7 +5,7 @@ library(sf)
 
 data_path <- Sys.getenv("DATA_PATH")
 
-# ddw reported data
+# ddw reported data 2013-2019
 l <- fs::dir_ls(path(data_path, "general/pws_water_use"), glob = "*.csv") %>% 
   map(~read_tsv(.x) %>% 
         mutate(year = str_remove_all(basename(.x), "EAR|LWS.csv|SWS.csv")) %>% 
@@ -22,7 +22,21 @@ l <- fs::dir_ls(path(data_path, "general/pws_water_use"), glob = "*.csv") %>%
         )
       )
 
-d <- bind_rows(l)
+# ddw data for 2020
+l2 <- fs::dir_ls(path(data_path, "general/pws_water_use"), glob = "*xlsx") %>% 
+  readxl::read_xlsx() %>% 
+  select(pwsid = PwsID, 
+         unit  = WPUnitsofMeasure, 
+         gw_af = WPAnnualGW) %>% 
+  mutate(year = "2020") %>% 
+  # convert gallons and million gallons to acre-feet
+  filter(unit %in% c("AF","G","MG")) %>% 
+  mutate(gw_af = case_when(
+    unit == "G"  ~ gw_af * 3.06889e-6,
+    unit == "MG" ~ gw_af * 3.06889,
+    TRUE ~ gw_af))
+
+d <- bind_rows(bind_rows(l), l2)
 
 # all water systems we need data for
 psrp <- read_rds(path(data_path, "data_output/srp_parcel_complete.rds"))
