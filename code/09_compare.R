@@ -34,7 +34,8 @@ p2 <- df %>%
   labs(y = "Estimated Groundwater pumping (AF/year)", x = "") + 
   scale_y_continuous(label = scales::comma) +
   theme_grey(base_size = 13) +
-  theme(panel.spacing = unit(1, "cm"))
+  theme(panel.spacing = unit(1, "cm"),
+        plot.margin = margin(10, 15, 10, 10))
 
 ggsave(p2, filename = here("results/compare_parcel_gwf_by_use.png"), 
        height = 4, width = 9)
