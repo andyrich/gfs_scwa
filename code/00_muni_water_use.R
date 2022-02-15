@@ -14,10 +14,12 @@ l <- fs::dir_ls(path(data_path, "general/pws_water_use"), glob = "*.csv") %>%
                gw_af = `WP Annual GW`,
                year) %>% 
         # convert gallons and million gallons to acre-feet
-        filter(unit %in% c("AF","G","MG")) %>% 
+        filter(unit != "-" & !is.na(unit)) %>%
         mutate(gw_af = case_when(
-          unit == "G"  ~ gw_af * 3.06889e-6,
-          unit == "MG" ~ gw_af * 3.06889,
+          unit == "G"   ~ gw_af * 3.06889e-6,
+          unit == "TG"  ~ gw_af * 3.06889e-3,
+          unit == "MG"  ~ gw_af * 3.06889,
+          unit == "CCF" ~ gw_af * 0.00229569,
           TRUE ~ gw_af)
         )
       )
@@ -29,14 +31,19 @@ l2 <- fs::dir_ls(path(data_path, "general/pws_water_use"), glob = "*xlsx") %>%
          unit  = WPUnitsofMeasure, 
          gw_af = WPAnnualGW) %>% 
   mutate(year = "2020") %>% 
-  # convert gallons and million gallons to acre-feet
-  filter(unit %in% c("AF","G","MG")) %>% 
+  # convert gallons, million gallons, ccf to acre-feet
+  filter(unit != "-" & !is.na(unit)) %>%
   mutate(gw_af = case_when(
-    unit == "G"  ~ gw_af * 3.06889e-6,
-    unit == "MG" ~ gw_af * 3.06889,
-    TRUE ~ gw_af))
+    unit == "G"   ~ gw_af * 3.06889e-6,
+    unit == "TG"  ~ gw_af * 3.06889e-3,
+    unit == "MG"  ~ gw_af * 3.06889,
+    unit == "CCF" ~ gw_af * 0.00229569,
+    TRUE ~ gw_af)
+  )
 
-d <- bind_rows(bind_rows(l), l2)
+d <- bind_rows(bind_rows(l), l2) %>% 
+  # IMPORTANT: control for incorrect data with reasonable use assumption
+  filter(gw_af <= 2500)
 
 # all water systems we need data for
 psrp <- read_rds(path(data_path, "data_output/srp_parcel_complete.rds"))
@@ -44,9 +51,15 @@ pson <- read_rds(path(data_path, "data_output/son_parcel_complete.rds"))
 ppet <- read_rds(path(data_path, "data_output/pet_parcel_complete.rds"))
 all <- bind_rows(psrp, pson, ppet)
 
-dw <- all$CA_DrinkingWater_SvcArea_Name %>% unique()
+# unique names in soco
+dw <- all$CA_DrinkingWater_SvcArea_Name %>% 
+  unique() %>% 
+  paste(collapse = "; ") %>% 
+  str_split("; ") %>% 
+  unlist() %>% 
+  unique()
 
-# pwsids of systems we need data for
+# unique pwsids and names of systems we need data for
 pwsid_key <- path(data_path, "general", "water_system_boundaries",
                   "SABL_Public_083121/SABL_Public_083121.shp") %>%
   st_read() %>%
@@ -54,48 +67,52 @@ pwsid_key <- path(data_path, "general", "water_system_boundaries",
   filter(WATER_SY_1 %in% dw) %>% 
   select(name = WATER_SY_1, pwsid = SABL_PWSID)
 
+# add pwsid to water systems in soco
+dw <- tibble(name = dw) %>% 
+  left_join(pwsid_key) %>% 
+  filter(!is.na(pwsid))
+
 # full gw use (all years) for appendix C
 d <- d %>% 
-  left_join(pwsid_key) %>% 
-  filter(name %in% dw & !is.na(name)) %>% 
-  # incorrect units create errors for two entries - remove them
-  filter(gw_af < 11000) %>% 
+  filter(pwsid %in% dw$pwsid) %>% 
+  left_join(dw) %>% 
   # Windsor only has one well, so we correct to Raftelis' 50 AF/yr
   mutate(gw_af = ifelse(name == "WINDSOR, TOWN OF", 50, gw_af)) %>% 
-  select(-unit) 
+  # all units are either AF, CCF, G, or MG at this point, so drop units
+  select(-unit)
   
 write_csv(d, here("data_output/ddw_muni_pumping_all_years.csv"))
 
-# calculate average annual gw use from 2013-2019
+# calculate average annual gw use from 2013-2020
 muni_gw <- d %>%
-  group_by(name) %>% 
-  summarise(gw_af = mean(gw_af)) %>% 
+  group_by(name, pwsid) %>% 
+  summarise(gw_af = mean(gw_af, na.rm = TRUE)) %>% 
   ungroup() 
 
-# add GSA names to pwsid and write
-ddw_gw <- all %>% 
-  st_drop_geometry() %>% 
-  select(name = CA_DrinkingWater_SvcArea_Name, 
-         gsa = GSA_Jurisdiction_Prelim) %>% 
-  distinct() %>% 
-  right_join(muni_gw) %>% 
-  arrange(desc(gw_af))
+# deduplicate sanity check
+length(muni_gw$name) == length(unique(muni_gw$name))
 
-# deduplicate - Cotati is mostly in SRP, so add it to that budget
-# and remove it from PET
-ddw_gw %>% 
-  count(name, sort = T) %>% 
-  filter(n > 1)
+# add gsas per water system
+gsa_key <- all %>% 
+  select(gsa  = GSA_Jurisdiction_Prelim, 
+         name = CA_DrinkingWater_SvcArea_Name) %>% 
+  st_drop_geometry() %>% 
+  # separate semicolon column and do some finessing to get a GSA:pswid key
+  separate(name, into = letters[1:20], sep = "; ") %>% 
+  janitor::remove_empty(which = "cols") %>% 
+  pivot_longer(-gsa, names_to = "rm", values_to = "name") %>% 
+  select(-rm) %>% 
+  filter(!is.na(name))
 
 # remove Cotati upon request from Permit Sonoma
-ddw_gw <- ddw_gw %>% 
+ddw_gw <- muni_gw %>% 
   anti_join(
     tibble(name = "COTATI, CITY OF",
            gsa  = "Petaluma Valley")
     ) %>% 
-  left_join(pwsid_key) %>% 
-  filter(gw_af > 0) %>% 
-  select(pwsid, everything())
+  left_join(gsa_key, by = "name") %>% 
+  select(pwsid, everything()) %>% 
+  distinct()
 
 write_csv(ddw_gw, here("data_output/ddw_muni_pumping.csv"))
 
@@ -113,18 +130,13 @@ write_csv(ddw_muni_pumping, here("data_output/ddw_muni_pumping_summary.csv"))
 # missing water systems ---------------------------------------------------
 
 muni_missing <- dw %>% 
-  paste(collapse = "; ") %>% 
-  str_split("; ") %>% 
-  unlist() %>% 
-  unique() %>% 
-  tibble(name = .) %>% 
-  left_join(pwsid_key) %>% 
   filter(
-    ! name %in% muni_gw$name & 
+    ! pwsid %in% muni_gw$pwsid & 
     !is.na(name) & 
     name != "NA" & 
     name != "NAPA, CITY OF"
   ) %>% 
-  arrange(pwsid, name)
+  arrange(pwsid, name) %>% 
+  filter(name != "WINDSOR, TOWN OF")
 
 write_csv(muni_missing, here("data_output/ddw_muni_missing.csv"))
