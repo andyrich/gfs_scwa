@@ -33,3 +33,13 @@ st_write(all, gjson_out)
 
 if(file_exists(shp_out)) file_delete(shp_out)
 st_write(all, shp_out)
+
+
+# swap field names with SCI field names and write
+sci <- read_csv(path(data_path, "general/sci_key.csv"))
+names(all) <- sci$new[match(names(all), sci$old)]
+
+shp_sci_out <- path(data_path, "data_output/shp/soco_gsas_parcel_sci.shp")
+
+if(file_exists(shp_sci_out)) file_delete(shp_sci_out)
+st_write(all, shp_sci_out)

@@ -514,12 +514,13 @@ f_verify_non_duplicates()
 
 # Reference ET0 in feet, via CIMIS ET0 zone 8: 
 # https://cimis.water.ca.gov/App_Themes/images/etozonemap.jpg
-et <- 4.1 
+# et <- 4.1 
 
 # Calculate applied water at schools from ET assuming 
 # application efficiency = 0.65 (65%) from Sandoval, 2010. 
 # http://watermanagement.ucdavis.edu/research/application-efficiency/
-aw <- et / (1 - 0.65) # feet
+# aw <- et / (1 - 0.65) # feet
+aw <- 3.5 # feet/yr from Andy Rich
 
 # school locations
 # school_codes <- filter(pson, str_detect(UseCode_Description, "SCHOOL")) %>% mapview()
@@ -527,8 +528,22 @@ aw <- et / (1 - 0.65) # feet
 # School_Golf_GW_Use_prelim_Ac_Ft 
 pson <- pson %>% 
   mutate(School_Golf_GW_Use_Prelim_Ac_Ft = 
-           ifelse(str_detect(UseCode_Description, "SCHOOL|GOLF"),
-                  (aw/LandSizeAcres)*0.5, 0)) 
+           ifelse(str_detect(tolower(UseCode_Description), 
+                             "school|golf|country club"),
+                  aw*LandSizeAcres*0.5, 0),
+         # following meeting with Marcus, Rob, and Andy: schools with
+         # a public water connection are assumed to NOT draw from groundwater
+         School_Golf_GW_Use_Prelim_Ac_Ft = 
+           ifelse(str_detect(tolower(UseCode_Description), "school") &
+                    Public_Water_Connection == "Yes",
+                  0, School_Golf_GW_Use_Prelim_Ac_Ft),
+         # following meeting with Marcus, Rob, and Andy: golf courses with
+         # NO onsite well(s) are assumed to NOT draw from groundwater
+         School_Golf_GW_Use_Prelim_Ac_Ft = 
+           ifelse(str_detect(tolower(UseCode_Description), "golf|country club") &
+                    Onsite_Well == "No",
+                  0, School_Golf_GW_Use_Prelim_Ac_Ft)
+  ) 
   
 # blank fields to permit revision of the data
 pson <- pson %>% 
