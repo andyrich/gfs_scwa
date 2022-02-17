@@ -43,7 +43,9 @@ l2 <- fs::dir_ls(path(data_path, "general/pws_water_use"), glob = "*xlsx") %>%
 
 d <- bind_rows(bind_rows(l), l2) %>% 
   # IMPORTANT: control for incorrect data with reasonable use assumption
-  filter(gw_af <= 2500)
+  filter(gw_af <= 2500 | pwsid == "CA4910017") %>% 
+  # Windsor only has one well, so we correct to Raftelis' 50 AF/yr
+  mutate(gw_af = ifelse(pwsid == "CA4910017", 50, gw_af)) 
 
 # all water systems we need data for
 psrp <- read_rds(path(data_path, "data_output/srp_parcel_complete.rds"))
@@ -76,8 +78,6 @@ dw <- tibble(name = dw) %>%
 d <- d %>% 
   filter(pwsid %in% dw$pwsid) %>% 
   left_join(dw) %>% 
-  # Windsor only has one well, so we correct to Raftelis' 50 AF/yr
-  mutate(gw_af = ifelse(name == "WINDSOR, TOWN OF", 50, gw_af)) %>% 
   # all units are either AF, CCF, G, or MG at this point, so drop units
   select(-unit)
   
