@@ -370,6 +370,18 @@ ppet <- ppet %>%
     "Yes", Public_Water_Connection)
   )
 
+# add public water connections for modified APNs:
+apn_add_pwc <- path(data_path, "general/modified_apns.xlsx") %>% 
+  readxl::read_xlsx(sheet = 1) %>% 
+  pull(APN)
+
+ppet <- ppet %>% 
+  mutate(Public_Water_Connection = ifelse(
+    APN %in% apn_add_pwc,
+    "Yes", Public_Water_Connection)
+  )
+
+
 f_progress()
 f_verify_non_duplicates()
 

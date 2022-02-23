@@ -307,6 +307,17 @@ psrp <- psrp %>%
     APN %in% explicit_connections$APN | Public_Water_Connection == "Yes",
     "Yes", "No"))
 
+# add public water connections for modified APNs:
+apn_add_pwc <- path(data_path, "general/modified_apns.xlsx") %>% 
+  readxl::read_xlsx(sheet = 1) %>% 
+  pull(APN)
+
+psrp <- psrp %>% 
+  mutate(Public_Water_Connection = ifelse(
+    APN %in% apn_add_pwc,
+    "Yes", Public_Water_Connection)
+  )
+
 # # ensure public water connection is listed for specified Accessor Use Codes
 # accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
 #                           "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
