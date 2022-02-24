@@ -4,7 +4,7 @@ echo "Constructing SRP database: "
 Rscript -e "source('02_srp.R');"
 
 echo "Constructing SON database: "
-Rscript -e "source('02_son.R');"
+Rscript -e "source('03_son.R');"
 
 echo "Constructing PET database: "
 Rscript -e "source('04_pet.R');"
