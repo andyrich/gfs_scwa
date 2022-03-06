@@ -53,3 +53,4 @@ For methods, see `docs/memo.docx`.
 ***
 
 Last updated by *Rich Pauloo* on 2022-02-08.  
+Transferred to SCWA github on 2022-3-6.
