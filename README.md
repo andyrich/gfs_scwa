@@ -22,7 +22,8 @@ EPSG = 3310
 
 The `DATA_PATH` is where project data dependencies are stored on a synced Dropbox folder. On my computer it's `~/Dropbox (LWA)/data/sonoma_co_gsas_rate_fee`, so my environmental variable is: `DATA_PATH = "~/Dropbox (LWA)/data/sonoma_co_gsas_rate_fee"`. In reality, this can be anywhere, including an external drive for very large data.  
 
-Use the following link to obtain Dropbox Data Dependencies used by the code: https://www.dropbox.com/sh/5lyd9r01zh62s7w/AABcQphVCHx41e-T5vTczu7va?dl=0
+Use the following link to obtain Dropbox Data Dependencies used by the code: ~~https://www.dropbox.com/sh/5lyd9r01zh62s7w/AABcQphVCHx41e-T5vTczu7va?dl=0~~
+https://www.dropbox.com/sh/bku6o6o98k0gy1x/AACzaT7kFYFUcpqUb0XFNvhza?dl=0
 
 
 The `EPSG` is the projection used in this study that all spatial data are standardized to.  
