@@ -424,8 +424,10 @@ psrp <- psrp %>%
 
 # Res_W_Use_Assessor_Ac_Ft = Water use rate based off assessor use code
 # Dependency provided by Rob P on 2021-11-16
+#accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
+#                          "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
 accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
-                          "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
+                          "Final 2022 Water  Use from Assessor Land Use Code.xlsx")
 res_use_accessor_key <- readxl::read_xlsx(accessor_key_path,
                                           sheet = 2) %>%
   janitor::clean_names() %>%

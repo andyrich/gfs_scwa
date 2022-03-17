@@ -285,11 +285,11 @@ print('The number of Urban Wells is:')
 print(table(counter$Urban_Well))
 
 
-# special deactivated wells 
-deactivated_wells <- path(data_path, "pet/public_water_connection",
-                          "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
-  readxl::read_xlsx(sheet = 4) %>% 
-  select(APN) 
+## special deactivated wells 
+#deactivated_wells <- path(data_path, "pet/public_water_connection",
+#                          "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
+#  readxl::read_xlsx(sheet = 4) %>% 
+#  select(APN) 
 
 f_progress()
 f_verify_non_duplicates()
@@ -357,10 +357,12 @@ ppet <- ppet %>%
   )
 
 # ensure public water connection is listed for specified Accessor Use Codes
+#accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
+#                          "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
 accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
-                          "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
+                          "Final 2022 Water  Use from Assessor Land Use Code.xlsx")
 pwc_accessor_key <- accessor_key_path %>% 
-  readxl::read_xlsx(sheet = 3, range = "B2:C27") %>% 
+  readxl::read_xlsx(sheet = 3, range = "B2:C28") %>% 
   janitor::clean_names() %>% 
   mutate(use_code = str_pad(use_code, 4, "left", "0"))
 
