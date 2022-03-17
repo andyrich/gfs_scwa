@@ -255,19 +255,12 @@ pet_wells <- path(data_path, "pet/public_water_connection",
   rename(Well_Count = n) %>% 
   mutate(Well_Log_Nos = NA) # well logs not provided
 
-
 all_wells <- bind_rows(sc_wells, pet_wells)
 
-# Permit Sonoma wells to remove
-ps_wells <- path(data_path, "pet/public_water_connection",
-                 "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
-  readxl::read_xlsx(sheet = 3) %>% 
-  select(APN) 
-
 # remove permit sonoma wells
-#todo - move this filter so that it does not change Urban wells
-all_wells <- all_wells %>% filter(!APN %in% ps_wells$APN)
-
+# line removed - incorrectly removed wells from the above cross-connection when 
+#it should have changed parcels to no connection instead
+#all_wells <- all_wells %>% filter(!APN %in% ps_wells$APN)
 
 # populate database columns
 ppet <- ppet %>% 
@@ -389,6 +382,21 @@ ppet <- ppet %>%
   mutate(Public_Water_Connection = ifelse(
     APN %in% apn_add_pwc,
     "Yes", Public_Water_Connection)
+  )
+
+# Permit Sonoma wells to remove
+ps_wells <- path(data_path, "pet/public_water_connection",
+                 "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
+  readxl::read_xlsx(sheet = 3) %>% 
+  #select(APN) 
+  pull(APN)
+
+#Use the Petaluma CROSSCONNECTION DATA CLEANED #3 to remove parcels from 
+#the Public_Water_Connection list. set them to 'no' 
+ppet <- ppet %>% 
+  mutate(Public_Water_Connection = ifelse(
+    APN %in% ps_wells,
+     "No", Public_Water_Connection)
   )
 
 
