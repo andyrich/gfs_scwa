@@ -257,14 +257,10 @@ pet_wells <- path(data_path, "pet/public_water_connection",
 
 all_wells <- bind_rows(sc_wells, pet_wells)
 
-# Permit Sonoma wells to remove
-ps_wells <- path(data_path, "pet/public_water_connection",
-                 "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
-  readxl::read_xlsx(sheet = 3) %>% 
-  select(APN) 
-
 # remove permit sonoma wells
-all_wells <- all_wells %>% filter(!APN %in% ps_wells$APN)
+# line removed - incorrectly removed wells from the above cross-connection when 
+#it should have changed parcels to no connection instead
+#all_wells <- all_wells %>% filter(!APN %in% ps_wells$APN)
 
 # populate database columns
 ppet <- ppet %>% 
@@ -279,14 +275,21 @@ ppet <- ppet %>%
     Onsite_Well = ifelse(
       Active_Well == "Yes" | Well_Records_Available == "Yes", 
       "Yes", "No"),
-    Urban_Well = "No" # placeholder for future review
+    #Urban_Well = "No" # placeholder for future review
+    Urban_Well = ifelse(Well_Count>0,'Yes','No')
   ) 
 
-# special deactivated wells 
-deactivated_wells <- path(data_path, "pet/public_water_connection",
-                          "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
-  readxl::read_xlsx(sheet = 4) %>% 
-  select(APN) 
+
+counter <- ppet[ppet$Urban_Well == 'Yes',]
+print('The number of Urban Wells is:')
+print(table(counter$Urban_Well))
+
+
+## special deactivated wells 
+#deactivated_wells <- path(data_path, "pet/public_water_connection",
+#                          "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
+#  readxl::read_xlsx(sheet = 4) %>% 
+#  select(APN) 
 
 f_progress()
 f_verify_non_duplicates()
@@ -354,10 +357,12 @@ ppet <- ppet %>%
   )
 
 # ensure public water connection is listed for specified Accessor Use Codes
+#accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
+#                          "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
 accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
-                          "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
+                          "Final 2022 Water  Use from Assessor Land Use Code.xlsx")
 pwc_accessor_key <- accessor_key_path %>% 
-  readxl::read_xlsx(sheet = 3, range = "B2:C27") %>% 
+  readxl::read_xlsx(sheet = 3, range = "B2:C28") %>% 
   janitor::clean_names() %>% 
   mutate(use_code = str_pad(use_code, 4, "left", "0"))
 
@@ -379,6 +384,21 @@ ppet <- ppet %>%
   mutate(Public_Water_Connection = ifelse(
     APN %in% apn_add_pwc,
     "Yes", Public_Water_Connection)
+  )
+
+# Permit Sonoma wells to remove
+ps_wells <- path(data_path, "pet/public_water_connection",
+                 "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
+  readxl::read_xlsx(sheet = 3) %>% 
+  #select(APN) 
+  pull(APN)
+
+#Use the Petaluma CROSSCONNECTION DATA CLEANED #3 to remove parcels from 
+#the Public_Water_Connection list. set them to 'no' 
+ppet <- ppet %>% 
+  mutate(Public_Water_Connection = ifelse(
+    APN %in% ps_wells,
+     "No", Public_Water_Connection)
   )
 
 
@@ -495,6 +515,7 @@ ppet <- ppet %>%
   mutate(
     Urban_Irrigation_GW_Use_Prelim_Ac_Ft = ifelse(
       Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
+#Todo Remove '&Public_Water_connection=='Yes' in order remove requirement that parcel has PWC and a well
 
 # blank fields to permit revision of the data
 ppet <- ppet %>% 

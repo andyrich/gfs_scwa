@@ -337,10 +337,12 @@ pson <- pson %>%
   )
 
 # ensure public water connection is listed for specified Accessor Use Codes
+#accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
+#                          "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
 accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
-                          "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
+                          "Final 2022 Water  Use from Assessor Land Use Code.xlsx")
 pwc_accessor_key <- readxl::read_xlsx(accessor_key_path, 
-                                      sheet = 3, range = "B2:C27") %>% 
+                                      sheet = 3, range = "B2:C28") %>% 
   janitor::clean_names() %>% 
   mutate(use_code = str_pad(use_code, 4, "left", "0"))
 
