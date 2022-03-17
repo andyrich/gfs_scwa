@@ -473,14 +473,18 @@ large_commercial_uses <- path(data_path, "pet/public_water_connection",
   select(APN, replacement_commercial_use = `ac-ft/yr`) 
 
 # add these reported large commercial uses
-ppet <- ppet %>% 
-  left_join(large_commercial_uses) %>% 
-  mutate(Commercial_W_Use_Assessor_Ac_Ft = ifelse(
-    !is.na(replacement_commercial_use),
-    replacement_commercial_use,
-    Commercial_W_Use_Assessor_Ac_Ft
-  )) %>% 
-  select(-replacement_commercial_use)
+# ppet <- ppet %>% 
+#   left_join(large_commercial_uses) %>% 
+#   mutate(Commercial_W_Use_Assessor_Ac_Ft = ifelse(
+#     !is.na(replacement_commercial_use),
+#     replacement_commercial_use,
+#     Commercial_W_Use_Assessor_Ac_Ft
+#   )) %>% 
+#   select(-replacement_commercial_use)
+# keep assessor use codes for updated commercial values. USED BELOW.
+ppet <- ppet %>%
+  left_join(large_commercial_uses) 
+
 
 # Commercial_GW_Use_Prelim_Ac_Ft is Commercial_W_Use_Assessor_Ac_Ft if
 # there's no public water connection, otherwise, it's 0
@@ -492,17 +496,32 @@ ppet <- ppet %>%
   ))
 
 # blank fields to permit revision of the data
-ppet <- ppet %>% 
-  mutate(Commercial_GW_Use_Modified       = "No",
-         Commercial_GW_Use_Modified_Ac_Ft = NA,
-         Commercial_GW_Use_Comment        = NA,
-         Commercial_GW_Use_Ac_Ft = ifelse(Commercial_GW_Use_Modified == "Yes", 
-                                          Commercial_GW_Use_Modified_Ac_Ft, 
-                                          Commercial_GW_Use_Prelim_Ac_Ft))
+# ppet <- ppet %>% 
+#   mutate(Commercial_GW_Use_Modified       = "No",
+#          Commercial_GW_Use_Modified_Ac_Ft = NA,
+#          Commercial_GW_Use_Comment        = NA,
+#          Commercial_GW_Use_Ac_Ft = ifelse(Commercial_GW_Use_Modified == "Yes", 
+#                                           Commercial_GW_Use_Modified_Ac_Ft, 
+#                                           Commercial_GW_Use_Prelim_Ac_Ft))
+# for commercial, check if there is a replacement_commercial_use. if there is 
+# then set Commercial_GW_Use_Modified == 'yes', and 
+# Commercial_GW_Use_Modified_Ac_Ft=Commercial_GW_Use_Modified_Ac_Ft
+# and then set Commercial_GW_Use_Ac_Ft = replacement_commercial_use.
+# otherwise set Commercial_GW_Use_Ac_Ft = Commercial_W_Use_Assessor_Ac_Ft
+ppet <- ppet %>%
+mutate(Commercial_GW_Use_Modified       = ifelse(!is.na(replacement_commercial_use),
+                                                 "Yes","No"),
+       Commercial_GW_Use_Modified_Ac_Ft = ifelse(Commercial_GW_Use_Modified=='Yes',
+                                                 replacement_commercial_use, 0),
+       Commercial_GW_Use_Comment        = ifelse(Commercial_GW_Use_Modified=='Yes',
+                                                 'Value From Petaluma Data Large water user dat', NA),
+       Commercial_GW_Use_Ac_Ft = ifelse(Commercial_GW_Use_Modified == "Yes", 
+                                        Commercial_GW_Use_Modified_Ac_Ft, 
+                                        Commercial_GW_Use_Prelim_Ac_Ft))  %>% 
+    select(-replacement_commercial_use)
 
 f_progress()
 f_verify_non_duplicates()
-
 
 # urban irrigation --------------------------------------------------------
 
