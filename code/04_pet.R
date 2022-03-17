@@ -255,6 +255,7 @@ pet_wells <- path(data_path, "pet/public_water_connection",
   rename(Well_Count = n) %>% 
   mutate(Well_Log_Nos = NA) # well logs not provided
 
+
 all_wells <- bind_rows(sc_wells, pet_wells)
 
 # Permit Sonoma wells to remove
@@ -264,7 +265,9 @@ ps_wells <- path(data_path, "pet/public_water_connection",
   select(APN) 
 
 # remove permit sonoma wells
+#todo - move this filter so that it does not change Urban wells
 all_wells <- all_wells %>% filter(!APN %in% ps_wells$APN)
+
 
 # populate database columns
 ppet <- ppet %>% 
@@ -279,8 +282,15 @@ ppet <- ppet %>%
     Onsite_Well = ifelse(
       Active_Well == "Yes" | Well_Records_Available == "Yes", 
       "Yes", "No"),
-    Urban_Well = "No" # placeholder for future review
+    #Urban_Well = "No" # placeholder for future review
+    Urban_Well = ifelse(Well_Count>0,'Yes','No')
   ) 
+
+
+counter <- ppet[ppet$Urban_Well == 'Yes',]
+print('The number of Urban Wells is:')
+print(table(counter$Urban_Well))
+
 
 # special deactivated wells 
 deactivated_wells <- path(data_path, "pet/public_water_connection",
@@ -495,6 +505,7 @@ ppet <- ppet %>%
   mutate(
     Urban_Irrigation_GW_Use_Prelim_Ac_Ft = ifelse(
       Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
+#Todo Remove '&Public_Water_connection=='Yes' in order remove requirement that parcel has PWC and a well
 
 # blank fields to permit revision of the data
 ppet <- ppet %>% 
