@@ -280,11 +280,6 @@ ppet <- ppet %>%
   ) 
 
 
-counter <- ppet[ppet$Urban_Well == 'Yes',]
-print('The number of Urban Wells is:')
-print(table(counter$Urban_Well))
-
-
 ## special deactivated wells 
 #deactivated_wells <- path(data_path, "pet/public_water_connection",
 #                          "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
