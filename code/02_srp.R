@@ -531,25 +531,65 @@ aw <- 3.5 # feet/yr from Andy Rich
 # school locations
 # filter(psrp, str_detect(UseCode_Description, "School|Golf")) %>% mapview()
 
+lawn <- path(data_path, "general/crops/i15_LandUse_Sonoma2012_SHP/i15_LandUse_Sonoma2012.shp") %>% 
+  st_read() %>% 
+  filter(CLASS1 == "UL") %>% #filter to only Urban Landscape
+  filter(SUBCLASS1 != "5") %>%  # urban landscape except class 5, which is non-irrigated
+  filter(WATERSOURC != "5") %>%  # watersource 5 is reclaimed
+  filter(WATERSOURC != "6") %>%  # watersource 6 is recycled
+  st_transform(epsg) %>% 
+  st_make_valid() %>% 
+  st_intersection(srp) %>% 
+  select(crop_class = CLASS1)
+
+# get lawn area per APN and recalculate area, and as before, because there many
+# APN with > 1 crop, we need to summarize the data before joining!
+lawn_per_apn <- st_intersection(select(psrp, APN), lawn) %>% 
+  mutate(crop_acres = 
+           as.numeric(units::set_units(st_area(geometry), "acres"))) %>% 
+  # very important! Duplicates are present, and de-duplication is needed
+  distinct() %>% 
+  st_drop_geometry() %>% 
+  # also incredibly important: there are multiple crop polygons per APN 
+  # that need to be summed!
+  group_by(APN, crop_class) %>% 
+  summarise(lawn_acres = sum(crop_acres, na.rm = TRUE)) %>% 
+  ungroup()  %>%
+  select(-crop_class)
+
+psrp<- left_join(psrp, lawn_per_apn) %>%
+  mutate(lawn_acres = ifelse(is.na(lawn_acres), 0, lawn_acres))
+
 # School_Golf_GW_Use_prelim_Ac_Ft 
 psrp <- psrp %>% 
   mutate(School_Golf_GW_Use_Prelim_Ac_Ft = 
            ifelse(str_detect(tolower(UseCode_Description), 
                              "school|golf|country club"),
-                  aw*LandSizeAcres*0.5, 0),
-         # following meeting with Marcus, Rob, and Andy: schools with
-         # a public water connection are assumed to NOT draw from groundwater
-         School_Golf_GW_Use_Prelim_Ac_Ft = 
-           ifelse(str_detect(tolower(UseCode_Description), "school") &
-                    Public_Water_Connection == "Yes",
-                  0, School_Golf_GW_Use_Prelim_Ac_Ft),
-         # following meeting with Marcus, Rob, and Andy: golf courses with
-         # NO onsite well(s) are assumed to NOT draw from groundwater
-         School_Golf_GW_Use_Prelim_Ac_Ft = 
-           ifelse(str_detect(tolower(UseCode_Description), "golf|country club") &
-                    Onsite_Well == "No",
-                  0, School_Golf_GW_Use_Prelim_Ac_Ft)
-  ) 
+                  # aw*LandSizeAcres*0.5, 0),
+                  aw*lawn_acres, 0),)   %>%
+                  select(-lawn_acres)
+
+# # School_Golf_GW_Use_prelim_Ac_Ft 
+# pson <- pson %>% 
+#   mutate(School_Golf_GW_Use_Prelim_Ac_Ft = 
+#            ifelse(str_detect(tolower(UseCode_Description), 
+#                              "school|golf|country club"),
+#                   aw*LandSizeAcres*0.5, 0),
+#          # following meeting with Marcus, Rob, and Andy: schools with
+#          # a public water connection are assumed to NOT draw from groundwater
+#          School_Golf_GW_Use_Prelim_Ac_Ft = 
+#            ifelse(str_detect(tolower(UseCode_Description), "school") &
+#                     Public_Water_Connection == "Yes",
+#                   0, School_Golf_GW_Use_Prelim_Ac_Ft),
+#          # following meeting with Marcus, Rob, and Andy: golf courses with
+#          # NO onsite well(s) are assumed to NOT draw from groundwater
+#          School_Golf_GW_Use_Prelim_Ac_Ft = 
+#            ifelse(str_detect(tolower(UseCode_Description), "golf|country club") &
+#                     Onsite_Well == "No",
+#                   0, School_Golf_GW_Use_Prelim_Ac_Ft)
+#   ) 
+#   
+
 
 # blank fields to permit revision of the data
 psrp <- psrp %>% 
