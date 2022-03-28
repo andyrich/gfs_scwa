@@ -25,7 +25,7 @@ psrp <- read_rds(path(data_path, "data_output/srp_parcel.rds"))
 cat("Loaded preprocedded spatial parcels from Sonoma County.\n")
 
 # final fields to use
-fields <- path(data_path, "schema/2021_11_03_schema.xlsx") %>% 
+fields <- path(data_path, "schema/2022_03_28_schema.xlsx") %>% 
   readxl::read_xlsx(sheet = 2, range = cellranger::cell_cols("D")) %>% 
   set_names("name") %>% 
   filter(!is.na(name)) %>% 
@@ -334,11 +334,16 @@ shelly_path <- path(data_path, "general", "address_apn.gdb")
 cat("Reading explicit connection data for:\n", 
     paste(rgdal::ogrListLayers(shelly_path), collapse = "\n "), "\n")
 
+print('using the following layer from shellys list')
+print(rgdal::ogrListLayers(shelly_path)[1])
+
+
 connections_shelly <- rgdal::ogrListLayers(shelly_path)[1] %>% 
   purrr::map_df(
     ~rgdal::readOGR(dsn = shelly_path, layer = .x) %>% 
       st_as_sf() %>% 
       select(APN))
+
 
 # if an explicit connection is present, ensure it is represented
 ppet <- ppet %>% 
@@ -561,7 +566,7 @@ lawn <- path(data_path, "general/crops/i15_LandUse_Sonoma2012_SHP/i15_LandUse_So
   st_read() %>% 
   filter(CLASS1 == "UL") %>% #filter to only Urban Landscape
   filter(SUBCLASS1 != "5") %>%  # urban landscape except class 5, which is non-irrigated
-  filter(WATERSOURC != "5") %>%  # watersource 5 is reclaimed
+  filter(WATERSOURC != "5") %>%  # watersource 5 is reclaimed, not excluding SW sources.
   filter(WATERSOURC != "6") %>%  # watersource 6 is recycled
   st_transform(epsg) %>% 
   st_make_valid() %>% 
@@ -589,11 +594,11 @@ ppet<- left_join(ppet, lawn_per_apn) %>%
 # School_Golf_GW_Use_prelim_Ac_Ft 
 ppet <- ppet %>% 
   mutate(School_Golf_GW_Use_Prelim_Ac_Ft = 
-           ifelse(str_detect(tolower(UseCode_Description), 
-                             "school|golf|country club"),
-                  # aw*LandSizeAcres*0.5, 0),
-                  aw*lawn_acres, 0),)   %>%
-  select(-lawn_acres)
+    ifelse(str_detect(tolower(UseCode_Description), 
+    "school|golf|country club|winery|cemeter|city park|county park|privately owned park|business park common area"),
+    # aw*LandSizeAcres*0.5, 0),
+    aw*lawn_acres, 0),)   %>%
+    select(-lawn_acres)
 # # following meeting with Marcus, Rob, and Andy: schools with
 # # a public water connection are assumed to NOT draw from groundwater
 # School_Golf_GW_Use_Prelim_Ac_Ft = 
@@ -631,6 +636,41 @@ ppet <- ppet %>%
 #                   0, School_Golf_GW_Use_Prelim_Ac_Ft)
 #   ) 
 #   
+
+####
+# Code to use to incorporate surface water/recycled water uses.
+# calculate groundwater School_Golf_GW_Use_Prelim_Ac_Ft water use
+ppet <- ppet %>%
+  mutate(
+    # first ensure that NA values in water budget components go to 0
+    School_Golf_GW_Use_Prelim_Ac_Ft  = ifelse(
+      is.na(School_Golf_GW_Use_Prelim_Ac_Ft), 0, School_Golf_GW_Use_Prelim_Ac_Ft),
+    Surface_Water_Use_Ac_Ft  = ifelse(
+      is.na(Surface_Water_Use_Ac_Ft), 0, Surface_Water_Use_Ac_Ft),
+    Recycled_Water_Use_Ac_Ft = ifelse(
+      is.na(Recycled_Water_Use_Ac_Ft), 0, Recycled_Water_Use_Ac_Ft),
+    #calculate School_Golf_Surface_Recycled_Use_Ac_Ft
+    School_Golf_Surface_Recycled_Use_Ac_Ft = Surface_Water_Use_Ac_Ft + Recycled_Water_Use_Ac_Ft,
+    # Ag School_Golf_GW_Use_Prelim_Ac_Ft use is the following mass balance:
+    School_Golf_GW_Use_Prelim_Ac_Ft =
+      School_Golf_GW_Use_Prelim_Ac_Ft -
+      (Surface_Water_Use_Ac_Ft + Recycled_Water_Use_Ac_Ft))
+
+# if a parcel receives more water from surface and recycled sources
+# than estimated demand, the calculated groundwater use is negative, so
+# we coerce this to zero
+ppet <- ppet %>%
+  mutate(School_Golf_GW_Use_Prelim_Ac_Ft = ifelse(
+    School_Golf_GW_Use_Prelim_Ac_Ft < 0, 0, School_Golf_GW_Use_Prelim_Ac_Ft))
+
+# if a parcel receives more water from surface and recycled sources
+# than estimated demand, then set the
+# total School_Golf_Surface_Recycled_Use_Ac_Ft = School_Golf_GW_Use_Prelim_Ac_Ft
+ppet <- ppet %>%
+  mutate(School_Golf_Surface_Recycled_Use_Ac_Ft = ifelse(
+    School_Golf_Surface_Recycled_Use_Ac_Ft > School_Golf_GW_Use_Prelim_Ac_Ft,
+    School_Golf_GW_Use_Prelim_Ac_Ft, School_Golf_Surface_Recycled_Use_Ac_Ft))
+####
 
 # blank fields to permit revision of the data
 ppet <- ppet %>% 
