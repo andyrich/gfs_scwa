@@ -303,10 +303,14 @@ wsa <- path(data_path, "general", "water_system_boundaries",
 # sanity check
 # mapview(pet) + mapview(wsa)
 
+# list of water service areas to remove
+wsa_remove = c('PETALUMA, CITY OF','PENNGROVE WATER COMPANY (PUC)')
+
 # add water service areas to parcel data, first need to summarize data
 # to avoid duplicates where a parcel falls within more than one water system!
 wsa_key <- st_join(ppet, wsa) %>% 
   select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
+  subset(!(CA_DrinkingWater_SvcArea_Name %in% wsa_remove)) %>%
   group_by(APN) %>% 
   # for parcels with > 1 water system, combine water system names
   mutate(CA_DrinkingWater_SvcArea_Name = paste(
@@ -320,9 +324,11 @@ wsa_key <- st_join(ppet, wsa) %>%
     CA_DrinkingWater_SvcArea_Name == "NA", 
     NA, CA_DrinkingWater_SvcArea_Name))
 
+
 ppet <- left_join(ppet, wsa_key) %>% 
   mutate(CA_DrinkingWater_SvcArea_Within = 
-           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
+           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name),"Yes", "No"))
+
 
 f_verify_non_duplicates()
 
@@ -337,24 +343,44 @@ cat("Reading explicit connection data for:\n",
 print('using the following layer from shellys list')
 print(rgdal::ogrListLayers(shelly_path)[1])
 
-
-connections_shelly <- rgdal::ogrListLayers(shelly_path)[1] %>% 
+#adding all of the connections to the database, not just the first one.
+connections_shelly <- rgdal::ogrListLayers(shelly_path) %>% 
   purrr::map_df(
     ~rgdal::readOGR(dsn = shelly_path, layer = .x) %>% 
-      st_as_sf() %>% 
+      # st_drop_geometry() %>%
+      st_as_sf() %>%
       select(APN))
 
+print('these are the connections_shelly')
+print(connections_shelly)
+print(dim(connections_shelly))
+
+petaluma_connect_path <- path(data_path, "pet","public_water_connection", "WaterServiceParcels_2020.xlsx")
+petaluma_connect <- petaluma_connect_path %>% 
+  readxl::read_xlsx(sheet = 1) %>% 
+  select(APN)
+
+print('these are the petaluma_connect')
+print(petaluma_connect)
+print(dim(petaluma_connect))
+
+allconnects <- bind_rows(petaluma_connect, connections_shelly)
+
+print('these are the allconnects')
+print(allconnects)
+print(dim(allconnects))
 
 # if an explicit connection is present, ensure it is represented
 ppet <- ppet %>% 
   mutate(
     Public_Water_Connection = 
-      ifelse(APN %in% connections_shelly$APN |
+      ifelse(APN %in% allconnects$APN |
                !is.na(CA_DrinkingWater_SvcArea_Name), 
              "Yes", "No"),
     Public_Water_Connection_Modified = NA,
     Water_Source_Comment = NA
   )
+
 
 # ensure public water connection is listed for specified Accessor Use Codes
 #accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
