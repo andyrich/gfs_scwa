@@ -535,6 +535,7 @@ lawn <- path(data_path, "general/crops/i15_LandUse_Sonoma2012_SHP/i15_LandUse_So
   st_read() %>% 
   filter(CLASS1 == "UL") %>% #filter to only Urban Landscape
   filter(SUBCLASS1 != "5") %>%  # urban landscape except class 5, which is non-irrigated
+  filter(WATERSOURC != "1") %>%  # watersource 1 is surface water
   filter(WATERSOURC != "5") %>%  # watersource 5 is reclaimed
   filter(WATERSOURC != "6") %>%  # watersource 6 is recycled
   st_transform(epsg) %>% 
