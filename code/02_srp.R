@@ -591,7 +591,9 @@ psrp <- psrp %>%
 #   ) 
 #   
 
-
+print(colnames((pson)))
+####
+print('adding school stuff')
 # Code to use to incorporate surface water/recycled water uses.
 # calculate groundwater School_Golf_GW_Use_Prelim_Ac_Ft water use
 psrp <- psrp %>%
@@ -605,25 +607,30 @@ psrp <- psrp %>%
       is.na(Recycled_Water_Use_Ac_Ft), 0, Recycled_Water_Use_Ac_Ft),
     #calculate School_Golf_Surface_Recycled_Use_Ac_Ft
     School_Golf_Surface_Recycled_Use_Ac_Ft = Surface_Water_Use_Ac_Ft + Recycled_Water_Use_Ac_Ft,
+    #calculate school_golf_gw_demand in order to limit surface/recycled water actual use
+    school_golf_gw_demand = School_Golf_GW_Use_Prelim_Ac_Ft,
     # Ag School_Golf_GW_Use_Prelim_Ac_Ft use is the following mass balance:
     School_Golf_GW_Use_Prelim_Ac_Ft =
       School_Golf_GW_Use_Prelim_Ac_Ft -
-      (Surface_Water_Use_Ac_Ft + Recycled_Water_Use_Ac_Ft))
+      (Surface_Water_Use_Ac_Ft + Recycled_Water_Use_Ac_Ft),
+  )
 
+print('modifying school stuff')
+print(colnames((psrp)))
 # if a parcel receives more water from surface and recycled sources
 # than estimated demand, the calculated groundwater use is negative, so
 # we coerce this to zero
 psrp <- psrp %>%
   mutate(School_Golf_GW_Use_Prelim_Ac_Ft = ifelse(
     School_Golf_GW_Use_Prelim_Ac_Ft < 0, 0, School_Golf_GW_Use_Prelim_Ac_Ft))
-
+print('modifying School_Golf_Surface_Recycled_Use_Ac_Ft')
 # if a parcel receives more water from surface and recycled sources
 # than estimated demand, then set the
 # total School_Golf_Surface_Recycled_Use_Ac_Ft = School_Golf_GW_Use_Prelim_Ac_Ft
 psrp <- psrp %>%
   mutate(School_Golf_Surface_Recycled_Use_Ac_Ft = ifelse(
-    School_Golf_Surface_Recycled_Use_Ac_Ft > School_Golf_GW_Use_Prelim_Ac_Ft,
-    School_Golf_GW_Use_Prelim_Ac_Ft, School_Golf_Surface_Recycled_Use_Ac_Ft))
+    School_Golf_Surface_Recycled_Use_Ac_Ft > school_golf_gw_demand,
+    school_golf_gw_demand, School_Golf_Surface_Recycled_Use_Ac_Ft))
 
 
 # blank fields to permit revision of the data
@@ -750,6 +757,8 @@ psrp <- psrp %>%
       is.na(Surface_Water_Use_Ac_Ft), 0, Surface_Water_Use_Ac_Ft),
     Recycled_Water_Use_Ac_Ft = ifelse(
       is.na(Recycled_Water_Use_Ac_Ft), 0, Recycled_Water_Use_Ac_Ft),
+    #calculate Ag_Surface_Recycled_Actual_Use_Ac_Ft
+    Ag_Surface_Recycled_Actual_Use_Ac_Ft = Surface_Water_Use_Ac_Ft + Recycled_Water_Use_Ac_Ft,
     # Ag GW use is the following mass balance:
     Ag_GW_Use_GIS_Ac_Ft = 
       Water_Use_Ag_Rate_Ac_Ft - 
@@ -761,6 +770,14 @@ psrp <- psrp %>%
 psrp <- psrp %>% 
   mutate(Ag_GW_Use_GIS_Ac_Ft = ifelse(
     Ag_GW_Use_GIS_Ac_Ft < 0, 0, Ag_GW_Use_GIS_Ac_Ft))
+
+# if a parcel receives more water from surface and recycled sources
+# than estimated demand, then set the
+# total Ag_Surface_Recycled_Actual_Use_Ac_Ft = Ag_GW_Use_GIS_Ac_Ft
+psrp <- psrp %>%
+  mutate(Ag_Surface_Recycled_Actual_Use_Ac_Ft = ifelse(
+    Ag_Surface_Recycled_Actual_Use_Ac_Ft > Water_Use_Ag_Rate_Ac_Ft,
+    Water_Use_Ag_Rate_Ac_Ft, Ag_Surface_Recycled_Actual_Use_Ac_Ft))
 
 # No Idle Acres to start - this is reported
 psrp <- psrp %>% mutate(Idle_Ac = 0)
