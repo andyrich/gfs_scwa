@@ -264,10 +264,18 @@ wsa <- path(data_path, "general", "water_system_boundaries",
 psrp$CA_DrinkingWater_SvcArea_Name <- NULL
 psrp$CA_DrinkingWater_SvcArea_Within <- NULL
 
+
+# list of water service areas to remove
+# these providers depend on explicit connection data for their Public_Water_Connection
+wsa_remove = c('SEBASTOPOL, CITY OF',
+               'WINDSOR, TOWN OF',
+               'PENNGROVE WATER COMPANY (PUC)')
+
 # add water service areas to parcel data, first need to summarize data
 # to avoid duplicates where a parcel falls within more than one water system!
 wsa_key <- st_join(psrp, wsa) %>% 
   select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
+  subset(!(CA_DrinkingWater_SvcArea_Name %in% wsa_remove)) %>%
   group_by(APN) %>% 
   # for parcels with > 1 water system, combine water system names
   mutate(CA_DrinkingWater_SvcArea_Name = paste(
@@ -281,9 +289,28 @@ wsa_key <- st_join(psrp, wsa) %>%
     CA_DrinkingWater_SvcArea_Name == "NA", 
     NA, CA_DrinkingWater_SvcArea_Name))
 
-psrp <- left_join(psrp, wsa_key) %>% 
-  mutate(CA_DrinkingWater_SvcArea_Within = 
-           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
+print(unique(wsa_key$CA_DrinkingWater_SvcArea_Name))
+
+# # add water service areas to parcel data, first need to summarize data
+# # to avoid duplicates where a parcel falls within more than one water system!
+# wsa_key <- st_join(psrp, wsa) %>% 
+#   select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
+#   group_by(APN) %>% 
+#   # for parcels with > 1 water system, combine water system names
+#   mutate(CA_DrinkingWater_SvcArea_Name = paste(
+#     CA_DrinkingWater_SvcArea_Name, collapse = "; ")) %>%
+#   ungroup() %>% 
+#   distinct() %>% 
+#   st_drop_geometry() %>% 
+#   select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
+#   # coerce character "NA" to NA
+#   mutate(CA_DrinkingWater_SvcArea_Name = ifelse(
+#     CA_DrinkingWater_SvcArea_Name == "NA", 
+#     NA, CA_DrinkingWater_SvcArea_Name))
+# 
+# psrp <- left_join(psrp, wsa_key) %>% 
+#   mutate(CA_DrinkingWater_SvcArea_Within = 
+#            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
 f_verify_non_duplicates()
 
