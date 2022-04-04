@@ -16,7 +16,14 @@ epsg <- as.numeric(Sys.getenv("EPSG"))
 # area of interest object to make helper functions work
 aoi = "pson"
 
+# delete complete DBs
+print('deleting...')
+gjson_out <- read_rds(path(data_path, "data_output/son_parcel_complete.rds"))
+if(file_exists(gjson_out)) file_delete(gjson_out)
+
 # load data ---------------------------------------------------------------
+
+
 
 # preprocessed spatial parcels from Sonoma Co parcels
 pson <- read_rds(path(data_path, "data_output/son_parcel.rds"))

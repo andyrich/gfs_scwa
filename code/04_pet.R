@@ -16,7 +16,13 @@ epsg <- as.numeric(Sys.getenv("EPSG"))
 # area of interest object to make helper functions work
 aoi = "ppet"
 
+# delete complete DBs
+print('deleting...')
+gjson_out <- read_rds(path(data_path, "data_output/pet_parcel_complete.rds"))
+if(file_exists(gjson_out)) file_delete(gjson_out)
+
 # load data ---------------------------------------------------------------
+
 
 # preprocessed spatial parcels from Sonoma Co parcels
 pson <- read_rds(path(data_path, "data_output/son_parcel.rds"))
@@ -304,7 +310,10 @@ wsa <- path(data_path, "general", "water_system_boundaries",
 # mapview(pet) + mapview(wsa)
 
 # list of water service areas to remove
-wsa_remove = c('PETALUMA, CITY OF','PENNGROVE WATER COMPANY (PUC)')
+wsa_remove = c('PETALUMA, CITY OF',
+               'PENNGROVE WATER COMPANY (PUC)',
+               'COTATI, CITY OF',
+               'ROHNERT PARK, CITY OF')
 
 # add water service areas to parcel data, first need to summarize data
 # to avoid duplicates where a parcel falls within more than one water system!
