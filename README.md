@@ -45,7 +45,7 @@ bash run.sh
 
 ## Schema
 
-Data schema that the database builds towards was defined by Permit Sonoma and is stored at `data_path/schema/2021_11_03_schema.xlsx`.  
+Data schema that the database builds towards was defined by Permit Sonoma and is stored at `data_path/schema/2022_03_28_schema.xlsx`.  
 
 For methods, see `docs/memo.docx`.
 
