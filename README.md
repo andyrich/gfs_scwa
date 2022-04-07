@@ -49,7 +49,9 @@ Data schema that the database builds towards was defined by Permit Sonoma and is
 
 For methods, see `docs/memo.docx`.
 
-
+## Output
+See the following site for updated output:
+https://andyrich.github.io/water_use/
 
 ***
 
