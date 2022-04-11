@@ -187,6 +187,11 @@ f_progress()
 #   select(-county)
 ewrims <- f_load_surface_water(data_path)
 
+ewrims_out <- path(data_path, "general/ewrims/exported_water_rights.geojson")
+if(file_exists(ewrims_out)) file_delete(ewrims_out)
+st_write(ewrims, ewrims_out)
+print('done writing water rights')
+
 # add surface water use (AF/year) to parcels, but be careful, as some
 # parcels have MULTIPLE ewrims points and these must be summarized
 ewrims_key <- st_join(select(psrp, APN), ewrims) %>%
@@ -197,6 +202,13 @@ ewrims_key <- st_join(select(psrp, APN), ewrims) %>%
   ) %>%
   ungroup()
 
+print(colnames(psrp))
+# print(colSums(psrp[,c('Surface_Water_Use_Ac_Ft')], na.rm = TRUE))
+print(unique(st_drop_geometry(psrp[,c('Surface_Water_Use_Ac_Ft')])))
+
+#remove columns Surface_Water_Connection and Surface_Water_Use_Ac_Ft
+psrp <- subset(psrp, select = -c(Surface_Water_Use_Ac_Ft, Surface_Water_Connection))
+
 psrp <- left_join(psrp, ewrims_key) %>%
   mutate(Surface_Water_Connection = ifelse(
     !is.na(Surface_Water_Use_Ac_Ft) & Surface_Water_Use_Ac_Ft > 0,
@@ -204,6 +216,8 @@ psrp <- left_join(psrp, ewrims_key) %>%
 f_progress()
 f_verify_non_duplicates()
 print('done loading surface water data')
+# print(colSums(psrp[,c('Surface_Water_Use_Ac_Ft')], na.rm = TRUE))
+print(unique(st_drop_geometry(psrp[,c('Surface_Water_Use_Ac_Ft')])))
 
 ## wells ------------------------------------------------------------------
 # Sonoma county wells - deduplicate
