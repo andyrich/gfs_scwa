@@ -84,6 +84,10 @@ psrp <- psrp %>%
   # remove brackets
   mutate(UseCode_Description = str_remove_all(UseCode_Description, "\\[|\\]"))
 
+print('this is what psrp looks like')
+print(colnames(psrp))
+
+
 # basin boundary parcels --------------------------------------------------
 
 # Does the parcel overlap SRP, Petaluma, or Sonoma Valley basins?
@@ -164,41 +168,56 @@ f_progress()
 
 
 ## surface water connection -----------------------------------------------
-# read ewrims data, filter to SON, transform, select relevant cols
-# ewrims <- dir_ls(path(data_path, "general/ewrims")) %>% 
-#   read_csv(col_select = c("longitude", "latitude", 
-#                           "face_value_amount", "county"), 
+# # read ewrims data, filter to SON, transform, select relevant cols
+# ewrims <- path(data_path, "general/ewrims", 'water_rights_list_2021-09-23.csv') %>%
+#   read_csv(col_select = c("longitude", "latitude",
+#                           "face_value_amount", "county"),
 #            col_types = list(
 #              longitude         = "d",
 #              latitude          = "d",
 #              face_value_amount = "d",
-#              county            = "c")) %>% 
-#   rename(Surface_Water_Use_Ac_Ft = face_value_amount) %>% 
-#   filter(county == "Sonoma" | is.na(county)) %>% 
-#   # remove a few rows without location data 
+#              county            = "c")) %>%
+#   rename(Surface_Water_Use_Ac_Ft = face_value_amount) %>%
+#   filter(county == "Sonoma" | is.na(county)) %>%
+#   # remove a few rows without location data
 #   filter(!is.na(latitude), !is.na(longitude),
-#          !is.nan(latitude), !is.nan(longitude)) %>% 
-#   st_as_sf(coords = c("longitude", "latitude"), crs = 4269) %>% 
-#   st_transform(epsg) %>% 
+#          !is.nan(latitude), !is.nan(longitude)) %>%
+#   st_as_sf(coords = c("longitude", "latitude"), crs = 4269) %>%
+#   st_transform(epsg) %>%
 #   select(-county)
-# 
-# # add surface water use (AF/year) to parcels, but be careful, as some 
-# # parcels have MULTIPLE ewrims points and these must be summarized
-# ewrims_key <- st_join(select(psrp, APN), ewrims) %>% 
-#   st_drop_geometry() %>% 
-#   group_by(APN) %>% 
-#   summarise(Surface_Water_Use_Ac_Ft = sum(
-#     Surface_Water_Use_Ac_Ft, na.rm = TRUE)
-#   ) %>% 
-#   ungroup()
-# 
-# psrp <- left_join(psrp, ewrims_key) %>% 
-#   mutate(Surface_Water_Connection = ifelse(
-#     !is.na(Surface_Water_Use_Ac_Ft) & Surface_Water_Use_Ac_Ft > 0, 
-#     "Yes", "No"))
-# f_progress()
-# f_verify_non_duplicates()
+ewrims <- f_load_surface_water(data_path)
 
+ewrims_out <- path(data_path, "general/ewrims/exported_water_rights.geojson")
+if(file_exists(ewrims_out)) file_delete(ewrims_out)
+st_write(ewrims, ewrims_out)
+print('done writing water rights')
+
+# add surface water use (AF/year) to parcels, but be careful, as some
+# parcels have MULTIPLE ewrims points and these must be summarized
+ewrims_key <- st_join(select(psrp, APN), ewrims) %>%
+  st_drop_geometry() %>%
+  group_by(APN) %>%
+  summarise(Surface_Water_Use_Ac_Ft = sum(
+    Surface_Water_Use_Ac_Ft, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+print(colnames(psrp))
+# print(colSums(psrp[,c('Surface_Water_Use_Ac_Ft')], na.rm = TRUE))
+print(unique(st_drop_geometry(psrp[,c('Surface_Water_Use_Ac_Ft')])))
+
+#remove columns Surface_Water_Connection and Surface_Water_Use_Ac_Ft
+psrp <- subset(psrp, select = -c(Surface_Water_Use_Ac_Ft, Surface_Water_Connection))
+
+psrp <- left_join(psrp, ewrims_key) %>%
+  mutate(Surface_Water_Connection = ifelse(
+    !is.na(Surface_Water_Use_Ac_Ft) & Surface_Water_Use_Ac_Ft > 0,
+    "Yes", "No"))
+f_progress()
+f_verify_non_duplicates()
+print('done loading surface water data')
+# print(colSums(psrp[,c('Surface_Water_Use_Ac_Ft')], na.rm = TRUE))
+print(unique(st_drop_geometry(psrp[,c('Surface_Water_Use_Ac_Ft')])))
 
 ## wells ------------------------------------------------------------------
 # Sonoma county wells - deduplicate
@@ -625,7 +644,7 @@ psrp <- psrp %>%
 #   ) 
 #   
 
-print(colnames((pson)))
+
 ####
 print('adding school stuff')
 # Code to use to incorporate surface water/recycled water uses.
@@ -649,8 +668,7 @@ psrp <- psrp %>%
       (Surface_Water_Use_Ac_Ft + Recycled_Water_Use_Ac_Ft),
   )
 
-print('modifying school stuff')
-print(colnames((psrp)))
+
 # if a parcel receives more water from surface and recycled sources
 # than estimated demand, the calculated groundwater use is negative, so
 # we coerce this to zero

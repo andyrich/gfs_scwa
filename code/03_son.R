@@ -18,7 +18,7 @@ aoi = "pson"
 
 # delete complete DBs
 print('deleting...')
-gjson_out <- read_rds(path(data_path, "data_output/son_parcel_complete.rds"))
+gjson_out <- path(data_path, "data_output/son_parcel_complete.rds")
 if(file_exists(gjson_out)) file_delete(gjson_out)
 
 # load data ---------------------------------------------------------------
@@ -155,22 +155,7 @@ f_progress()
 
 ## surface water connection -----------------------------------------------
 # read ewrims data, filter to SON, transform, select relevant cols
-ewrims <- dir_ls(path(data_path, "general/ewrims")) %>% 
-  read_csv(col_select = c("longitude", "latitude", 
-                          "face_value_amount", "county"), 
-           col_types = list(
-             longitude         = "d",
-             latitude          = "d",
-             face_value_amount = "d",
-             county            = "c")) %>% 
-  rename(Surface_Water_Use_Ac_Ft = face_value_amount) %>% 
-  filter(county == "Sonoma" | is.na(county)) %>% 
-  # remove a few rows without location data 
-  filter(!is.na(latitude), !is.na(longitude),
-         !is.nan(latitude), !is.nan(longitude)) %>% 
-  st_as_sf(coords = c("longitude", "latitude"), crs = 4269) %>% 
-  st_transform(epsg) %>% 
-  select(-county)
+ewrims <- f_load_surface_water(data_path)
 
 # add surface water use (AF/year) to parcels, but be careful, as some 
 # parcels have MULTIPLE ewrims points and these must be summarized
