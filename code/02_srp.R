@@ -610,14 +610,21 @@ lawn_per_apn <- st_intersection(select(psrp, APN), lawn) %>%
 psrp<- left_join(psrp, lawn_per_apn) %>%
   mutate(lawn_acres = ifelse(is.na(lawn_acres), 0, lawn_acres))
 
+#if no public connection, remove lawns <0.2 acres
+psrp<- psrp %>%
+  mutate(lawn_acres = ifelse(Public_Water_Connection == 'No' & lawn_acres<0.2,
+                             0, lawn_acres))
+
+#if there is public connection, remove lawns <0.5 acres
+psrp<- psrp %>%
+  mutate(lawn_acres = ifelse(Public_Water_Connection == 'Yes' & lawn_acres<0.5,
+                             0, lawn_acres))
+
 # School_Golf_GW_Use_prelim_Ac_Ft 
 psrp <- psrp %>% 
   mutate(School_Golf_GW_Use_Prelim_Ac_Ft = 
-    ifelse(str_detect(tolower(UseCode_Description), 
-    "school|golf|country club|winery|cemeter|city park|county park|privately owned park|business park common area"),
-    # aw*LandSizeAcres*0.5, 0),
-    aw*lawn_acres, 0),)   %>%
-    select(-lawn_acres)
+           aw*lawn_acres)   %>%
+  select(-lawn_acres)
 
 # # School_Golf_GW_Use_prelim_Ac_Ft 
 # pson <- pson %>% 
