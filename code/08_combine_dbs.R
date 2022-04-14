@@ -9,6 +9,8 @@ f_load_dotenv()
 data_path <- Sys.getenv("DATA_PATH")
 epsg <- as.numeric(Sys.getenv("EPSG"))
 
+
+
 # read complete DBs
 psrp <- read_rds(path(data_path, "data_output/srp_parcel_complete.rds"))
 pson <- read_rds(path(data_path, "data_output/son_parcel_complete.rds")) 

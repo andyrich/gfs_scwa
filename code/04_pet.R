@@ -614,13 +614,20 @@ lawn_per_apn <- st_intersection(select(ppet, APN), lawn) %>%
 ppet<- left_join(ppet, lawn_per_apn) %>%
   mutate(lawn_acres = ifelse(is.na(lawn_acres), 0, lawn_acres))
 
+#if no public connection, remove lawns <0.2 acres
+ppet<- ppet %>%
+  mutate(lawn_acres = ifelse(Public_Water_Connection == 'No' & lawn_acres<0.2,
+                0, lawn_acres))
+
+#if there is public connection, remove lawns <0.5 acres
+ppet<- ppet %>%
+  mutate(lawn_acres = ifelse(Public_Water_Connection == 'Yes' & lawn_acres<0.5,
+                0, lawn_acres))
+
 # School_Golf_GW_Use_prelim_Ac_Ft 
 ppet <- ppet %>% 
   mutate(School_Golf_GW_Use_Prelim_Ac_Ft = 
-    ifelse(str_detect(tolower(UseCode_Description), 
-    "school|golf|country club|winery|cemeter|city park|county park|privately owned park|business park common area"),
-    # aw*LandSizeAcres*0.5, 0),
-    aw*lawn_acres, 0),)   %>%
+    aw*lawn_acres)   %>%
     select(-lawn_acres)
 # # following meeting with Marcus, Rob, and Andy: schools with
 # # a public water connection are assumed to NOT draw from groundwater
@@ -660,9 +667,8 @@ ppet <- ppet %>%
 #   ) 
 #   
 
-print(colnames((ppet)))
 ####
-print('adding school stuff')
+
 # Code to use to incorporate surface water/recycled water uses.
 # calculate groundwater School_Golf_GW_Use_Prelim_Ac_Ft water use
 ppet <- ppet %>%
@@ -683,8 +689,7 @@ ppet <- ppet %>%
       School_Golf_GW_Use_Prelim_Ac_Ft -
       (Surface_Water_Use_Ac_Ft + Recycled_Water_Use_Ac_Ft),
   )
-print('modifying school stuff')
-print(colnames((ppet)))
+
 # if a parcel receives more water from surface and recycled sources
 # than estimated demand, the calculated groundwater use is negative, so
 # we coerce this to zero
@@ -699,8 +704,7 @@ print('modifying School_Golf_Surface_Recycled_Use_Ac_Ft')
 ppet <- ppet %>%
   mutate(School_Golf_Surface_Recycled_Use_Ac_Ft = ifelse(
     School_Golf_Surface_Recycled_Use_Ac_Ft > school_golf_gw_demand,
-    school_golf_gw_demand, School_Golf_Surface_Recycled_Use_Ac_Ft)) %>%
-  select(-school_golf_gw_demand)
+    school_golf_gw_demand, School_Golf_Surface_Recycled_Use_Ac_Ft))
 ####
 
 # blank fields to permit revision of the data
