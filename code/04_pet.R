@@ -699,8 +699,7 @@ print('modifying School_Golf_Surface_Recycled_Use_Ac_Ft')
 ppet <- ppet %>%
   mutate(School_Golf_Surface_Recycled_Use_Ac_Ft = ifelse(
     School_Golf_Surface_Recycled_Use_Ac_Ft > school_golf_gw_demand,
-    school_golf_gw_demand, School_Golf_Surface_Recycled_Use_Ac_Ft)) %>%
-  select(-school_golf_gw_demand)
+    school_golf_gw_demand, School_Golf_Surface_Recycled_Use_Ac_Ft)) 
 ####
 
 # blank fields to permit revision of the data
