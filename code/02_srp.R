@@ -22,6 +22,8 @@ gjson_out <- path(data_path, "data_output/srp_parcel_complete.rds")
 print('deleting...')
 if(file_exists(gjson_out)) file_delete(gjson_out)
 
+gw_use_rate = 1.00 #$ per AF
+
 # load data ---------------------------------------------------------------
 
 
@@ -84,8 +86,6 @@ psrp <- psrp %>%
   # remove brackets
   mutate(UseCode_Description = str_remove_all(UseCode_Description, "\\[|\\]"))
 
-print('this is what psrp looks like')
-print(colnames(psrp))
 
 
 # basin boundary parcels --------------------------------------------------
@@ -202,9 +202,6 @@ ewrims_key <- st_join(select(psrp, APN), ewrims) %>%
   ) %>%
   ungroup()
 
-print(colnames(psrp))
-# print(colSums(psrp[,c('Surface_Water_Use_Ac_Ft')], na.rm = TRUE))
-print(unique(st_drop_geometry(psrp[,c('Surface_Water_Use_Ac_Ft')])))
 
 #remove columns Surface_Water_Connection and Surface_Water_Use_Ac_Ft
 psrp <- subset(psrp, select = -c(Surface_Water_Use_Ac_Ft, Surface_Water_Connection))
@@ -216,7 +213,6 @@ psrp <- left_join(psrp, ewrims_key) %>%
 f_progress()
 f_verify_non_duplicates()
 print('done loading surface water data')
-# print(colSums(psrp[,c('Surface_Water_Use_Ac_Ft')], na.rm = TRUE))
 print(unique(st_drop_geometry(psrp[,c('Surface_Water_Use_Ac_Ft')])))
 
 ## wells ------------------------------------------------------------------
@@ -682,7 +678,8 @@ print('modifying School_Golf_Surface_Recycled_Use_Ac_Ft')
 psrp <- psrp %>%
   mutate(School_Golf_Surface_Recycled_Use_Ac_Ft = ifelse(
     School_Golf_Surface_Recycled_Use_Ac_Ft > school_golf_gw_demand,
-    school_golf_gw_demand, School_Golf_Surface_Recycled_Use_Ac_Ft))
+    school_golf_gw_demand, School_Golf_Surface_Recycled_Use_Ac_Ft)) %>%
+  select(-school_golf_gw_demand)
 
 
 # blank fields to permit revision of the data
@@ -909,7 +906,8 @@ psrp <- psrp %>%
       Ag_GW_Use_Ac_Ft + 
       School_Golf_GW_Use_Ac_Ft + 
       Urban_Irrigation_GW_Use_Ac_Ft,
-    Total_Groundwater_Use_PublicView = NA
+    Total_Groundwater_Use_PublicView = NA,
+    Parcel_fee = Total_Groundwater_Use_Ac_Ft*gw_use_rate
   )
 
 # additional columns
