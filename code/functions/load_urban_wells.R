@@ -14,7 +14,12 @@ load_urban_wells <- function(data_path,parc){
   print('Done loading urban wells')
   
   parc<- left_join(parc, urb) %>%
-    mutate(Urban_Well = ifelse(is.na(Urban_list), 'No', 'Yes'))
+    mutate(Urban_Well = ifelse(is.na(Urban_list), 'No', 'Yes')) %>%
+    select(-Urban_list)
+  
+  #count number of occurrences of each value (including NA values) in column
+  print('these are the total value counts in urban_wells for the basin')
+  print(as.data.frame(table(parc$Urban_Well, useNA = 'always')))
   
   return(parc)
 }
