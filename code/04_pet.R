@@ -269,7 +269,7 @@ ppet <- ppet %>%
       Active_Well == "Yes" | Well_Records_Available == "Yes", 
       "Yes", "No"),
     #Urban_Well = "No" # placeholder for future review
-    Urban_Well = ifelse(Well_Count>0,'Yes','No')
+    # Urban_Well = ifelse(Well_Count>0,'Yes','No')
   ) 
 
 
@@ -550,6 +550,8 @@ f_verify_non_duplicates()
 # all urban wells are set to "No" for now, per instructions in the data 
 # dictionary: '(default value is "No")... Parcel sets from GUIDE Survey or 
 # Cities will be used in the future to set to "Yes"'
+
+ppet <- load_urban_wells(data_path, ppet)
 
 # if there’s an urban well & public water connection, assume 0.1 AF/yr, else 0
 ppet <- ppet %>% 
