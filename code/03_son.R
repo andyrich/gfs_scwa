@@ -378,32 +378,32 @@ vomwd_apn_st <- path(data_path, "son", "public_water_connection",
 
 # get APNs of parcels with an urban well connection, see 2021-09-13 email
 # from Rob Pennington for methods: VOMWD  Urban Well Use Logic
-vomwd_urban_wells <- path(data_path, "son", "public_water_connection", 
-                          "VOMWD Data August 2021", 
-                          "Master Location & Backflow data.xlsx") %>% 
-  readxl::read_xlsx(sheet = 2) %>% 
-  select(st_no = `Street Number`, st = `Street Name`,
-         well = `Well on Site`, bf = `BF Type`, notes = Notes) %>% 
-  mutate(st = paste(st_no, st)) %>% 
-  select(-st_no) %>% 
-  distinct() %>% 
-  left_join(vomwd_apn_st) %>% 
-  group_by(APN) %>% 
-  summarise(well = paste(well, collapse = " "), 
-            bf = paste(bf, collapse = " "),
-            notes = paste(notes, collapse = " ")) %>% 
-  ungroup() %>% 
-  mutate(
-    Urban_Well = ifelse(str_detect(well, "Yes"), "Yes", "No"), 
-    Urban_Well = ifelse(str_detect(notes, "HOA") & 
-                  str_detect(bf, "RP") & 
-                  str_detect(well, "NA"), 
-                "Yes", Urban_Well)) %>% 
-  filter(Urban_Well == "Yes")
+# vomwd_urban_wells <- path(data_path, "son", "public_water_connection", 
+#                           "VOMWD Data August 2021", 
+#                           "Master Location & Backflow data.xlsx") %>% 
+#   readxl::read_xlsx(sheet = 2) %>% 
+#   select(st_no = `Street Number`, st = `Street Name`,
+#          well = `Well on Site`, bf = `BF Type`, notes = Notes) %>% 
+#   mutate(st = paste(st_no, st)) %>% 
+#   select(-st_no) %>% 
+#   distinct() %>% 
+#   left_join(vomwd_apn_st) %>% 
+#   group_by(APN) %>% 
+#   summarise(well = paste(well, collapse = " "), 
+#             bf = paste(bf, collapse = " "),
+#             notes = paste(notes, collapse = " ")) %>% 
+#   ungroup() %>% 
+#   mutate(
+#     Urban_Well = ifelse(str_detect(well, "Yes"), "Yes", "No"), 
+#     Urban_Well = ifelse(str_detect(notes, "HOA") & 
+#                   str_detect(bf, "RP") & 
+#                   str_detect(well, "NA"), 
+#                 "Yes", Urban_Well)) %>% 
+#   filter(Urban_Well == "Yes")
 
-# add urban wells from VOMWD
-pson <- pson %>% 
-  mutate(Urban_Well = ifelse(APN %in% vomwd_urban_wells$APN, "Yes", "No"))
+# # add urban wells from VOMWD
+# pson <- pson %>% 
+#   mutate(Urban_Well = ifelse(APN %in% vomwd_urban_wells$APN, "Yes", "No"))
 
 f_progress()
 f_verify_non_duplicates()
@@ -494,6 +494,8 @@ f_verify_non_duplicates()
 # all urban wells are set to "No" for now, per instructions in the data 
 # dictionary: '(default value is "No")... Parcel sets from GUIDE Survey or 
 # Cities will be used in the future to set to "Yes"'
+
+pson <- load_urban_wells(data_path, pson)
 
 # if there’s an urban well & public water connection, assume 0.1 AF/yr, else 0
 pson <- pson %>% 

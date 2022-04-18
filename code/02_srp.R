@@ -213,7 +213,7 @@ psrp <- left_join(psrp, ewrims_key) %>%
 f_progress()
 f_verify_non_duplicates()
 print('done loading surface water data')
-print(unique(st_drop_geometry(psrp[,c('Surface_Water_Use_Ac_Ft')])))
+# print(unique(st_drop_geometry(psrp[,c('Surface_Water_Use_Ac_Ft')])))
 
 ## wells ------------------------------------------------------------------
 # Sonoma county wells - deduplicate
@@ -285,7 +285,8 @@ wsa <- path(data_path, "general", "water_system_boundaries",
 # rm Shelly's work
 psrp$CA_DrinkingWater_SvcArea_Name <- NULL
 psrp$CA_DrinkingWater_SvcArea_Within <- NULL
-
+psrp$Urban_Well <- NULL
+psrp$Urban_Irrigation_GW_Use_Prelim_Ac_Ft <- NULL
 
 # list of water service areas to remove
 # these providers depend on explicit connection data for their Public_Water_Connection
@@ -311,7 +312,7 @@ wsa_key <- st_join(psrp, wsa) %>%
     CA_DrinkingWater_SvcArea_Name == "NA", 
     NA, CA_DrinkingWater_SvcArea_Name))
 
-print(unique(wsa_key$CA_DrinkingWater_SvcArea_Name))
+# print(unique(wsa_key$CA_DrinkingWater_SvcArea_Name))
 
 # # add water service areas to parcel data, first need to summarize data
 # # to avoid duplicates where a parcel falls within more than one water system!
@@ -545,11 +546,13 @@ psrp <- psrp %>%
 # dictionary: '(default value is "No")... Parcel sets from GUIDE Survey or 
 # Cities will be used in the future to set to "Yes"'
 
+psrp <- load_urban_wells(data_path, psrp)
+
 # if there’s an urban well & public water connection, assume 0.1 AF/yr, else 0
-# psrp <- psrp %>% 
-#   mutate(
-#     Urban_Irrigation_GW_Use_Prelim_Ac_Ft = ifelse(
-#       Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
+psrp <- psrp %>%
+  mutate(
+    Urban_Irrigation_GW_Use_Prelim_Ac_Ft = ifelse(
+      Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
 # 
 # # blank fields to permit revision of the data
 psrp <- psrp %>%
