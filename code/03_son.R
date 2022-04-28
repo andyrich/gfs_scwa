@@ -126,6 +126,9 @@ pson <- pson %>%
 
 f_progress()
 
+### add parcel land size
+pson <- load_land_size(data_path, pson)
+
 # sanity check
 # mapview(pet, alpha.regions = 0) + 
 #   mapview(son, alpha.regions = 0) + 

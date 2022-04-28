@@ -133,6 +133,9 @@ psrp <- psrp %>%
 
 f_progress()
 
+### add parcel land size
+psrp <- load_land_size(data_path, psrp)
+
 # sanity check - requires ppet parcels in memory
 # mapview(pet, alpha.regions = 0) +
 #   mapview(srp, alpha.regions = 0) +
