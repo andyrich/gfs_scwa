@@ -73,6 +73,8 @@ ppet <- ppet %>%
     MailingAddress4     = MailAdr4)
 f_progress()
 
+### add parcel land size
+ppet <- load_land_size(data_path, ppet)
 
 # remove fields -----------------------------------------------------------
 
