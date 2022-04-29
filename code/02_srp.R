@@ -67,7 +67,29 @@ psrp <- psrp %>% select(-all_of(rem))
 cat("Removed", length(rem), "fields from parcel database.\n   ",
     paste(rem, collapse = "\n    "))
 
+colstodrop = c(
+  "Res_GW_Use_Modified",
+  "Res_GW_Use_Modified_Ac_Ft",
+  "Res_GW_Use_Comment",
+  "Commercial_GW_Use_Modified",
+  "Commercial_GW_Use_Modified_Ac_Ft",
+  "Commercial_GW_Use_Comment",
+  "Urban_Irrigation_Modified",
+  "Urban_Irrigation_Modified_Ac_Ft",
+  "Urban_Irrigation_GW_Use_Comment",
+  "School_Golf_Modified",
+  "School_Golf_Modified_Ac_Ft",
+  "School_Golf_GW_Use_Comment")
 
+# if you want to see if these fields should be dropped, uncomment here:
+# for (val in cols){
+#   print(val)
+#   print(unique(st_drop_geometry(psrp[,val])))
+# }
+# all fields are either null or "No' for Modified
+
+#drop the following columns
+psrp <- select(psrp, -colstodrop)
 
 # ad hoc cleaning post-shelly's work --------------------------------------
 
@@ -132,6 +154,7 @@ psrp <- psrp %>%
     "Petaluma Valley", GSA_Jurisdiction_Prelim))
 
 f_progress()
+
 
 ### add parcel land size
 psrp <- load_land_size(data_path, psrp)
@@ -504,11 +527,14 @@ psrp <- psrp %>%
     0
   ))
 
+print(colnames(psrp))
+asdf
+# load modified fields
+psrp <- join_with_modified(psrp)
+
 # blank fields to permit revision of the data
 psrp <- psrp %>%
-  mutate(Res_GW_Use_Modified       = "No",
-         Res_GW_Use_Modified_Ac_Ft = NA,
-         Res_GW_Use_Comment        = NA,
+  mutate(
          Res_GW_Use_Ac_Ft = ifelse(Res_GW_Use_Modified == "Yes",
                                    Res_GW_Use_Modified_Ac_Ft,
                                    Res_GW_Use_Prelim_Ac_Ft))
@@ -531,9 +557,7 @@ psrp <- psrp %>%
  
 # # blank fields to permit revision of the data
 psrp <- psrp %>%
-  mutate(Commercial_GW_Use_Modified       = "No",
-         Commercial_GW_Use_Modified_Ac_Ft = NA,
-         Commercial_GW_Use_Comment        = NA,
+  mutate(
          Commercial_GW_Use_Ac_Ft          = ifelse(
            Commercial_GW_Use_Modified == "Yes",
            Commercial_GW_Use_Modified_Ac_Ft,
@@ -559,9 +583,7 @@ psrp <- psrp %>%
 # 
 # # blank fields to permit revision of the data
 psrp <- psrp %>%
-  mutate(Urban_Irrigation_Modified       = "No",
-         Urban_Irrigation_Modified_Ac_Ft = NA,
-         Urban_Irrigation_GW_Use_Comment = NA,
+  mutate(
          Urban_Irrigation_GW_Use_Ac_Ft   = ifelse(
            Urban_Irrigation_Modified == "Yes",
            Urban_Irrigation_GW_Use_Modified_Ac_Ft,
@@ -697,9 +719,7 @@ psrp <- psrp %>%
 
 # blank fields to permit revision of the data
 psrp <- psrp %>% 
-  mutate(School_Golf_Modified       = "No",
-         School_Golf_Modified_Ac_Ft = NA,
-         School_Golf_GW_Use_Comment = NA,
+  mutate(
          School_Golf_GW_Use_Ac_Ft = ifelse(School_Golf_Modified == "Yes", 
                                            School_Golf_GW_Use_Modified_Ac_Ft, 
                                            School_Golf_GW_Use_Prelim_Ac_Ft)) 
@@ -844,21 +864,11 @@ psrp <- psrp %>%
 # No Idle Acres to start - this is reported
 psrp <- psrp %>% mutate(Idle_Ac = 0)
 
-# modifications
-psrp <- psrp %>%
-  mutate(
-    # Ag use - surface use + recycled water (all negative values set to 0)
-    Ag_GW_Use_Modified       = "No",
-    Ag_GW_Use_Modified_Ac_Ft = NA,
-    Ag_GW_Use_Ac_Ft          = NA,
-    Ag_GW_Use_Comment        = NA
-  )
+
 
 # blank fields to permit revision of the data
 psrp <- psrp %>% 
-  mutate(Ag_GW_Use_Modified       = "No",
-         Ag_GW_Use_Modified_Ac_Ft = NA,
-         Ag_GW_Use_Comment        = NA,
+  mutate(
          Ag_GW_Use_Ac_Ft = ifelse(Ag_GW_Use_Modified == "Yes", 
                                   Ag_GW_Use_Modified_Ac_Ft, 
                                   Ag_GW_Use_GIS_Ac_Ft)) 
