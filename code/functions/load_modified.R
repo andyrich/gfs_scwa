@@ -5,10 +5,12 @@ load_modified <- function(var){
   # function to load modified table
   df <-  readxl::read_xlsx( path(data_path, "general/modified_values",
                                  paste(var,  '.xlsx', sep ='') ))
+  
+  comment = str_replace(str_replace(var,'GW_Use_',''), "Modified", 'GW_Use_Comment')
 
   cols = c('APN',
            str_replace(var, "Modified", 'Modified_Ac_Ft'),
-           str_replace(var, "Modified", 'Comment'))
+            comment)
   
   # assigning new names to the columns of the data frame
   colnames(df) <- cols

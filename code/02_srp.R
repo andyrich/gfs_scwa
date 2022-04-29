@@ -527,8 +527,6 @@ psrp <- psrp %>%
     0
   ))
 
-print(colnames(psrp))
-asdf
 # load modified fields
 psrp <- join_with_modified(psrp)
 
