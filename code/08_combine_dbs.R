@@ -42,7 +42,7 @@ if(file_exists(gjson_out)) file_delete(gjson_out)
 # if(file_exists(shp_out)) file_delete(shp_out)
 # st_write(all, shp_out)
 
-
+all_og_labels <- all
 # write prmd formatted files
 all <- relable_parc(all)
 
@@ -71,12 +71,16 @@ all %>%
 # if(file_exists(gjson_out_geom)) file_delete(gjson_out_geom)
 # st_write(all[,c('geometry','APN')], gjson_out_geom)
 
-# # swap field names with SCI field names and write
-# sci <- read_csv(path(data_path, "general/sci_key.csv"))
-# names(all) <- sci$new[match(names(all), sci$old)]
-# 
-# shp_sci_out <- path(data_path, "data_output/shp/soco_gsas_parcel_sci.shp")
-# print('writing sci shapefile')
-# if(file_exists(shp_sci_out)) file_delete(shp_sci_out)
-# st_write(all, shp_sci_out)
-# print('done writing shapefile')
+# swap field names with SCI field names and write
+sci <- read_csv(path(data_path, "general/sci_key.csv"))
+names(all_og_labels) <- sci$new[match(names(all_og_labels), sci$old)]
+
+shp_sci_out <- path(data_path, "data_output/soco_gsas_parcel_sci.csv")
+print('writing sci shapefile')
+if(file_exists(shp_sci_out)) file_delete(shp_sci_out)
+
+# write to csv
+all_og_labels %>% 
+  st_drop_geometry() %>% 
+  write_csv(shp_sci_out)
+print('done writing shapefile')
