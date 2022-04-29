@@ -475,11 +475,12 @@ ppet <- ppet %>%
     0
   ))
 
+# load modified fields
+ppet <- join_with_modified(ppet)
+
 # blank fields to permit revision of the data
 ppet <- ppet %>% 
-  mutate(Res_GW_Use_Modified       = "No",
-         Res_GW_Use_Modified_Ac_Ft = NA,
-         Res_GW_Use_Comment        = NA,
+  mutate(
          Res_GW_Use_Ac_Ft = ifelse(Res_GW_Use_Modified == "Yes", 
                                    Res_GW_Use_Modified_Ac_Ft, 
                                    Res_GW_Use_Prelim_Ac_Ft))
@@ -490,11 +491,11 @@ f_verify_non_duplicates()
 
 # commercial water use ----------------------------------------------------
 
-# reported commercial uses from Petaluma
-large_commercial_uses <- path(data_path, "pet/public_water_connection",
-                          "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
-  readxl::read_xlsx(sheet = 6) %>% 
-  select(APN, replacement_commercial_use = `ac-ft/yr`) 
+# # reported commercial uses from Petaluma
+# large_commercial_uses <- path(data_path, "pet/public_water_connection",
+#                           "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
+#   readxl::read_xlsx(sheet = 6) %>% 
+#   select(APN, replacement_commercial_use = `ac-ft/yr`) 
 
 # add these reported large commercial uses
 # ppet <- ppet %>% 
@@ -506,15 +507,15 @@ large_commercial_uses <- path(data_path, "pet/public_water_connection",
 #   )) %>% 
 #   select(-replacement_commercial_use)
 # keep assessor use codes for updated commercial values. USED BELOW.
-ppet <- ppet %>%
-  left_join(large_commercial_uses) 
+# ppet <- ppet %>%
+#   left_join(large_commercial_uses) 
 
 
 # Commercial_GW_Use_Prelim_Ac_Ft is Commercial_W_Use_Assessor_Ac_Ft if
 # there's no public water connection, otherwise, it's 0
-ppet <- ppet %>% 
+ppet <- ppet %>%
   mutate(Commercial_GW_Use_Prelim_Ac_Ft = ifelse(
-    Public_Water_Connection == "No", 
+    Public_Water_Connection == "No",
     Commercial_W_Use_Assessor_Ac_Ft,
     0
   ))
@@ -532,17 +533,23 @@ ppet <- ppet %>%
 # Commercial_GW_Use_Modified_Ac_Ft=Commercial_GW_Use_Modified_Ac_Ft
 # and then set Commercial_GW_Use_Ac_Ft = replacement_commercial_use.
 # otherwise set Commercial_GW_Use_Ac_Ft = Commercial_W_Use_Assessor_Ac_Ft
+# ppet <- ppet %>%
+# mutate(Commercial_GW_Use_Modified       = ifelse(!is.na(replacement_commercial_use),
+#                                                  "Yes","No"),
+#        Commercial_GW_Use_Modified_Ac_Ft = ifelse(Commercial_GW_Use_Modified=='Yes',
+#                                                  replacement_commercial_use, 0),
+#        Commercial_GW_Use_Comment        = ifelse(Commercial_GW_Use_Modified=='Yes',
+#                                                  'Value From Petaluma Data Large water user dat', NA),
+#        Commercial_GW_Use_Ac_Ft = ifelse(Commercial_GW_Use_Modified == "Yes", 
+#                                         Commercial_GW_Use_Modified_Ac_Ft, 
+#                                         Commercial_GW_Use_Prelim_Ac_Ft))  %>% 
+    # select(-replacement_commercial_use)
+
 ppet <- ppet %>%
-mutate(Commercial_GW_Use_Modified       = ifelse(!is.na(replacement_commercial_use),
-                                                 "Yes","No"),
-       Commercial_GW_Use_Modified_Ac_Ft = ifelse(Commercial_GW_Use_Modified=='Yes',
-                                                 replacement_commercial_use, 0),
-       Commercial_GW_Use_Comment        = ifelse(Commercial_GW_Use_Modified=='Yes',
-                                                 'Value From Petaluma Data Large water user dat', NA),
-       Commercial_GW_Use_Ac_Ft = ifelse(Commercial_GW_Use_Modified == "Yes", 
-                                        Commercial_GW_Use_Modified_Ac_Ft, 
-                                        Commercial_GW_Use_Prelim_Ac_Ft))  %>% 
-    select(-replacement_commercial_use)
+  mutate(
+         Commercial_GW_Use_Ac_Ft = ifelse(Commercial_GW_Use_Modified == "Yes",
+                                          Commercial_GW_Use_Modified_Ac_Ft,
+                                          Commercial_GW_Use_Prelim_Ac_Ft))
 
 f_progress()
 f_verify_non_duplicates()
@@ -564,9 +571,7 @@ ppet <- ppet %>%
 
 # blank fields to permit revision of the data
 ppet <- ppet %>% 
-  mutate(Urban_Irrigation_Modified       = "No",
-         Urban_Irrigation_Modified_Ac_Ft = NA,
-         Urban_Irrigation_GW_Use_Comment = NA,
+  mutate(
          Urban_Irrigation_GW_Use_Ac_Ft   = ifelse(
            Urban_Irrigation_Modified == "Yes", 
            Urban_Irrigation_GW_Use_Modified_Ac_Ft, 
@@ -714,9 +719,7 @@ ppet <- ppet %>%
 
 # blank fields to permit revision of the data
 ppet <- ppet %>% 
-  mutate(School_Golf_Modified       = "No",
-         School_Golf_Modified_Ac_Ft = NA,
-         School_Golf_GW_Use_Comment = NA,
+  mutate(
          School_Golf_GW_Use_Ac_Ft = ifelse(School_Golf_Modified == "Yes", 
                                            School_Golf_GW_Use_Modified_Ac_Ft, 
                                            School_Golf_GW_Use_Prelim_Ac_Ft)) 
@@ -859,21 +862,11 @@ ppet <- ppet %>%
 # No Idle Acres to start - this is reported
 ppet <- ppet %>% mutate(Idle_Ac = 0)
 
-# modifications
-ppet <- ppet %>%
-  mutate(
-    # Ag use - surface use + recycled water (all negative values set to 0)
-    Ag_GW_Use_Modified       = "No",
-    Ag_GW_Use_Modified_Ac_Ft = NA,
-    Ag_GW_Use_Ac_Ft          = NA,
-    Ag_GW_Use_Comment        = NA
-  )
+
 
 # blank fields to permit revision of the data
 ppet <- ppet %>% 
-  mutate(Ag_GW_Use_Modified       = "No",
-         Ag_GW_Use_Modified_Ac_Ft = NA,
-         Ag_GW_Use_Comment        = NA,
+  mutate(
          Ag_GW_Use_Ac_Ft = ifelse(Ag_GW_Use_Modified == "Yes", 
                                   Ag_GW_Use_Modified_Ac_Ft, 
                                   Ag_GW_Use_GIS_Ac_Ft)) 
