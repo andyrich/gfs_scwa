@@ -147,11 +147,11 @@ psrp <- psrp %>%
   # remove intermediate vars
   select(-area_prop_apn)
 
-# if not a basin boundary parcel, it's an interior GSA parcel
+# overwrite all of the above work, have default be that basin is Santa Rosa Plain Will
+# be recalculated at combine_db
 psrp <- psrp %>% 
-  mutate(GSA_Jurisdiction_Prelim = ifelse(
-    is.na(GSA_Jurisdiction_Prelim),
-    "Petaluma Valley", GSA_Jurisdiction_Prelim))
+  mutate(GSA_Jurisdiction_Prelim = "Santa Rosa Plain")
+
 
 f_progress()
 

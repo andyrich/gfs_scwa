@@ -19,8 +19,34 @@ ppet <- read_rds(path(data_path, "data_output/pet_parcel_complete.rds"))
 # ensure same crs
 map_dbl(list(psrp, pson, ppet), ~st_crs(.x)$epsg) 
 
+# assign JurisDiction, then selet record below
+psrp$GSA_Jurisdiction_Prelim <- "Santa Rosa Plain"
+ppet$GSA_Jurisdiction_Prelim <- "Petaluma Valley"
+pson$GSA_Jurisdiction_Prelim <- "Sonoma Valley"
+
 # combine
 all <- bind_rows(psrp, pson, ppet)
+
+# find parcel with record with biggest area -- assign that basin to Juris
+
+#find duplicated and non-dupliacted APN's
+nondup <- all[!(duplicated(all$APN) |duplicated(all$APN, fromLast=TRUE)) ,]
+dup <- all[duplicated(all$APN) | duplicated(all$APN, fromLast = TRUE),]
+
+# sorting the data by the column
+# required in descending order
+dup <- dup[order(dup$LandSizeAcres,
+                 decreasing = TRUE), ]
+
+# select top 1 values from each group
+dup <- Reduce(rbind,                                
+              by(dup,
+                 st_drop_geometry(dup["APN"]),
+                 head,
+                 n = 1))
+
+all <- bind_rows(dup, nondup)
+
 
 # write to shp and csv
 print('done writing csv output')
@@ -66,10 +92,10 @@ all %>%
 # if(file_exists(shp_out_prmd)) file_delete(shp_out_prmd)
 # st_write(head(all,10), shp_out_prmd)
 
-# gjson_out_geom <- path(data_path, "data_output/soco_parcel_geom_only.geojson")
-# print('writing geojson')
-# if(file_exists(gjson_out_geom)) file_delete(gjson_out_geom)
-# st_write(all[,c('geometry','APN')], gjson_out_geom)
+gjson_out_geom <- path(data_path, "data_output/soco_parcel_geom_only.geojson")
+print('writing geojson')
+if(file_exists(gjson_out_geom)) file_delete(gjson_out_geom)
+st_write(all[,c('geometry','APN')], gjson_out_geom)
 
 # swap field names with SCI field names and write
 sci <- read_csv(path(data_path, "general/sci_key.csv"))
