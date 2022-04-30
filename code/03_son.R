@@ -118,11 +118,11 @@ pson <- pson %>%
   # remove intermediate vars
   select(-area_prop_apn)
 
-# if not a basin boundary parcel, it's an interior GSA parcel
+# overwrite all of the above work, have default be that basin is Son Will
+# be recalculated at combine_db
 pson <- pson %>% 
-  mutate(GSA_Jurisdiction_Prelim = ifelse(
-    is.na(GSA_Jurisdiction_Prelim),
-    "Petaluma Valley", GSA_Jurisdiction_Prelim))
+  mutate(GSA_Jurisdiction_Prelim = "Sonoma Valley")
+
 
 f_progress()
 
