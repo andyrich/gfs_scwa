@@ -10,12 +10,18 @@ relable_parc <- function(parc){
   #   select(c('Field_Name', 'Field_Name_PRMD'))
   
   s_ <- path(data_path, "schema", 
-             'GSA Schema Field Revision Genealogy 2022Apr21.xlsx')
+             'GSA Schema 20220503.xlsx')
   print('Loading pre-processed list of urban wells')
   schema <- s_ %>%
-    readxl::read_xlsx(sheet = 'Sheet1') %>%
-    rename(Field_Name = 'LWA, SCWA, PRMD Schema Field Name',
-            Field_Name_PRMD = 'PRMD Public Database Field Name') %>%
+    readxl::read_xlsx(sheet = 'Sheet1')
+  
+  colnames(schema) <- gsub(" ", "_", colnames(schema))
+  
+  schema <- schema %>%
+    subset(!is.na(PRMD_Public_Database_Order)) %>% #drop na's
+    arrange(PRMD_Public_Database_Order) %>% # sort value based on 
+    rename(Field_Name = 'Field_Name_(proposed)',
+           Field_Name_PRMD = PRMD_Public_Database_Field_Name) %>%
     select(c('Field_Name', 'Field_Name_PRMD'))
   
   new_row <- c('geometry', 'geometry')
