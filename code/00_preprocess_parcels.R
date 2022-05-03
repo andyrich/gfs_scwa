@@ -5,6 +5,15 @@ library(mapview)
 library(fs)
 library(furrr)
 
+
+dir_ls(here("code/functions")) %>% walk(~source(.x))
+f_load_dotenv() 
+
+data_path <- Sys.getenv("DATA_PATH")
+epsg <- as.numeric(Sys.getenv("EPSG"))
+
+data_path <- Sys.getenv("DATA_PATH")
+
 # load data ---------------------------------------------------------------
 # b118 data: https://water.ca.gov/programs/groundwater-management/bulletin-118
 b118_path <- path(data_path, "general/b118/i08_B118_v6-1.shp") 
@@ -13,7 +22,7 @@ b118_path <- path(data_path, "general/b118/i08_B118_v6-1.shp")
 son <- f_load_b118_basin(b118_path, "NAPA-SONOMA VALLEY - SONOMA VALLEY")
 pet <- f_load_b118_basin(b118_path, "PETALUMA VALLEY")
 srp <- f_load_b118_basin(b118_path, "SANTA ROSA VALLEY - SANTA ROSA PLAIN")
-mapview(list(son, pet, srp))
+
 
 # union of all GSAs
 gsas <- reduce(list(son, pet, srp), st_union) %>% as("Spatial")
@@ -36,6 +45,7 @@ gsa_parcel <- st_as_sf(gsa_parcel) %>%
   mutate(LndSzAcre = st_area(geometry) %>% 
          units::set_units(acres) %>% 
          as.numeric()) 
+
 
 # intersect parcels to GSA boundaries and write for later use
 aoi_in <- list(son, pet, srp)

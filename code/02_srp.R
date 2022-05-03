@@ -121,6 +121,8 @@ boundary_parcels <- psrp$APN[psrp$APN %in% ppet$APN]
 
 psrp <- psrp %>% 
   mutate(
+    # Add parcel size
+    LandSizeParcelAcres = LandSizeAcres,
     # Is the parcel a boundary parcel
     Basin_Boundary_Parcel = ifelse(APN %in% boundary_parcels, "Yes", "No"),
     # area of the total APN across both GSAs is the recorded APN area
@@ -157,7 +159,7 @@ f_progress()
 
 
 ### add parcel land size
-psrp <- load_land_size(data_path, psrp)
+# psrp <- load_land_size(data_path, psrp)
 
 # sanity check - requires ppet parcels in memory
 # mapview(pet, alpha.regions = 0) +

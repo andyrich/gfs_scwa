@@ -62,7 +62,8 @@ rem  <- rem[-length(rem)] # don't remove the geometry column
 pson <- pson %>% 
   mutate(
     # parcel and contact info
-    LandSizeAcres       = LndSzAcre,
+    LandSizeAcres       = LndSzAcre, # this value gets changed below
+    LandSizeParcelAcres = LandSizeAcres,
     UseCode_Description = UseCDesc,
     UseCode_Category    = UseCType,
     CurrentOwnerName    = NA,
@@ -126,8 +127,8 @@ pson <- pson %>%
 
 f_progress()
 
-### add parcel land size
-pson <- load_land_size(data_path, pson)
+# ### add parcel land size
+# pson <- load_land_size(data_path, pson)
 
 # sanity check
 # mapview(pet, alpha.regions = 0) + 
