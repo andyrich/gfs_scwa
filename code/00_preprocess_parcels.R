@@ -44,7 +44,14 @@ cat(round(nrow(gsa_parcel@data) / nrow(parcel@data) * 100, 2),
 gsa_parcel <- st_as_sf(gsa_parcel) %>% 
   mutate(LndSzAcre = st_area(geometry) %>% 
          units::set_units(acres) %>% 
-         as.numeric()) 
+         as.numeric())
+
+# add field of parcels that intersect edge of any basin
+gsa_j = bind_rows(pet, srp, son)
+gsa_jb <-  st_geometry(st_cast(st_as_sf(gsa_j),'MULTILINESTRING'))
+f = st_intersects(st_geometry(gsa_parcel), gsa_jb, sparse=TRUE)
+gsa_parcel <- mutate(gsa_parcel,
+               edge = ifelse(lengths(f)>0, 'Yes','No'))
 
 
 # intersect parcels to GSA boundaries and write for later use
@@ -67,6 +74,13 @@ psrp <- rgdal::ogrListLayers(srp_gdb_path)[2] %>%
   st_as_sf() %>% 
   st_transform(epsg) %>% 
   st_make_valid() %>% 
+  as("Spatial")
+
+# add field of parcels that intersect edge of any basin
+f = st_intersects(st_geometry(st_as_sf(psrp)), gsa_jb, sparse=TRUE)
+psrp <- st_as_sf(psrp) %>%
+  mutate(
+    edge = ifelse(lengths(f)>0, 'Yes','No')) %>%
   as("Spatial")
 
 # crop shelly's SRP parcels to GSA boundaries, intersect with SRP and write
