@@ -38,7 +38,7 @@ fields <- path(data_path, "schema/GSA Schema 20220503.xlsx") %>%
   set_names("name") %>% 
   filter(!is.na(name)) %>% 
   pull(name)
-fields <- c(fields, "UseCode") # add use code and drop it later
+fields <- c(fields, "UseCode", 'edge') # add use code and drop it later
 
 # GSA spatial data
 b118_path <- path(data_path, "general/b118/i08_B118_v6-1.shp") 
@@ -158,7 +158,8 @@ ppet <- ppet %>%
 # overwrite all of the above work, have default be that basin is Petaluma. Will
 # be recalculated at combine_db
 ppet <- ppet %>% 
-  mutate(GSA_Jurisdiction_Prelim = "Petaluma Valley")
+  mutate(GSA_Jurisdiction_Prelim = "Petaluma Valley",
+         Basin_Boundary_Parcel = edge) %>% select(-edge)
 
 
 f_progress()
