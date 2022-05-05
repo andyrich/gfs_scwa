@@ -3,10 +3,10 @@ load_urban_wells <- function(data_path,parc){
   print('loading surface water data')
 
   urban_wells_list <- path(data_path, "general/urban_wells", 
-                   'urban_wells_ALL_2022_04_18.xlsx')
+                   'urban_wells_ALL_2022_05_05.xlsx')
   print('Loading pre-processed list of urban wells')
   urb <- urban_wells_list %>%
-    readxl::read_xlsx(sheet = 'urban_wells_ALL_2022_05_05') %>%
+    readxl::read_xlsx(sheet = 'Sheet1') %>%
     select(APN)
   
   urb$Urban_list <- 'Yes'
