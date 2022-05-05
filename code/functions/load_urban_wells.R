@@ -6,7 +6,7 @@ load_urban_wells <- function(data_path,parc){
                    'urban_wells_ALL_2022_04_18.xlsx')
   print('Loading pre-processed list of urban wells')
   urb <- urban_wells_list %>%
-    readxl::read_xlsx(sheet = 'Urban_Wells_ALL_2022_04_18') %>%
+    readxl::read_xlsx(sheet = 'urban_wells_ALL_2022_05_05') %>%
     select(APN)
   
   urb$Urban_list <- 'Yes'
