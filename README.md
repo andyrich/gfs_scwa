@@ -1,6 +1,6 @@
 # gfs
 
-LWA is prime to SCI on a **G**SA **F**ee and rate **S**tudy (gfs) for Sonoma County GSAs: 
+**G**SA **F**ee and rate **S**tudy (gfs) for Sonoma County GSAs: 
 
 * Santa Rosa Plain  
 * Sonoma Valley  
