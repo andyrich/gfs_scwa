@@ -181,15 +181,11 @@ f_progress()
 # recycled water delivered to parcels in 2016 (from billy.dixon@scwa.ca.gov)
 recy <- path(
   data_path, 
-  "pet/recycled_water/Petaluma_2016_Recyled Water_APN.xlsx") %>% 
-  readxl::read_xlsx(sheet = 3) %>%
-  select(APN, cubic_feet_adj) %>% 
-  group_by(APN) %>% 
-  summarise(cubic_feet_adj = sum(cubic_feet_adj, na.rm = TRUE)) %>% 
-  ungroup() %>% 
-  # convert feet^3 to AF
-  mutate(Recycled_Water_Use_Ac_Ft = cubic_feet_adj * 2.29569e-5) %>% 
-  select(-cubic_feet_adj)
+  "pet/recycled_water/City of Petaluma 2016-2021 Recycled Water Summary.xlsx") %>% 
+  readxl::read_xlsx(sheet = 1) %>%
+  select(APN, Mean) %>% 
+  mutate(Recycled_Water_Use_Ac_Ft = Mean) %>% 
+  select(-Mean)
 
 # add recycled water parcels to parcel data
 ppet <- left_join(ppet, recy, by = "APN") %>% 
