@@ -67,7 +67,12 @@ psrp <- psrp %>% select(-all_of(rem))
 cat("Removed", length(rem), "fields from parcel database.\n   ",
     paste(rem, collapse = "\n    "))
 
+
+
 colstodrop = c(
+  'Ag_GW_Use_Modified',
+  'Ag_GW_Use_Modified_Ac_Ft',
+  'Ag_GW_Use_Comment',
   "Res_GW_Use_Modified",
   "Res_GW_Use_Modified_Ac_Ft",
   "Res_GW_Use_Comment",
@@ -78,7 +83,7 @@ colstodrop = c(
   "Urban_Irrigation_Modified_Ac_Ft",
   "Urban_Irrigation_GW_Use_Comment",
   "School_Golf_Modified",
-  "School_Golf_Modified_Ac_Ft",
+  # "School_Golf_Modified_Ac_Ft",
   "School_Golf_GW_Use_Comment")
 
 # if you want to see if these fields should be dropped, uncomment here:
@@ -89,7 +94,9 @@ colstodrop = c(
 # all fields are either null or "No' for Modified
 
 #drop the following columns
+print('removing cols')
 psrp <- select(psrp, -colstodrop)
+print('done')
 
 # ad hoc cleaning post-shelly's work --------------------------------------
 
@@ -183,6 +190,27 @@ f_progress()
 ## recycled water ---------------------------------------------------------
 # load delivery data from recycled water treatment plants
 
+psrp$Recycled_Water_Use_Ac_Ft <- NULL
+
+# loading recycled water data from the Raftellis database
+recycled_water_path <- path(data_path, "srp", "recycled_water",
+                          "srp_recycled_water.xlsx")
+recy <- readxl::read_xlsx(recycled_water_path, sheet = 1) %>%
+  select(APN,
+         Recycled_Water_Use_Ac_Ft = Value)
+
+# add recycled water parcels to parcel data
+psrp <- left_join(psrp, recy, by = "APN") %>%
+  mutate(Recycled_Water_Connection = ifelse(
+    !is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No"))
+
+print('here is the sum of the recycled water')
+print(psrp %>%
+          st_drop_geometry() %>%
+          select(Recycled_Water_Use_Ac_Ft)  %>%
+          colSums(na.rm = TRUE))
+
+
 # recycled water delivered to parcels in 2016 (from billy.dixon@scwa.ca.gov)
 # recy <- path(data_path, 
 #              "son/recycled_water/SVCSD Recycled Water Use APNs.xlsx") %>% 
@@ -193,7 +221,7 @@ f_progress()
 # psrp <- left_join(psrp, recy, by = "APN") %>% 
 #   mutate(Recycled_Water_Connection = ifelse(
 #     !is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No"))
-# f_progress()
+f_progress()
 
 
 ## surface water connection -----------------------------------------------
@@ -316,6 +344,7 @@ psrp$CA_DrinkingWater_SvcArea_Name <- NULL
 psrp$CA_DrinkingWater_SvcArea_Within <- NULL
 psrp$Urban_Well <- NULL
 psrp$Urban_Irrigation_GW_Use_Prelim_Ac_Ft <- NULL
+
 
 # list of water service areas to remove
 # these providers depend on explicit connection data for their Public_Water_Connection

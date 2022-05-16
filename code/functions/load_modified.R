@@ -6,16 +6,30 @@ load_modified <- function(var){
   df <-  readxl::read_xlsx( path(data_path, "general/modified_values",
                                  paste(var,  '.xlsx', sep ='') ))
   
-  comment = str_replace(str_replace(var,'GW_Use_',''), "Modified", 'GW_Use_Comment')
+
+  
+  l <- list(
+    Ag_GW_Use_Modified= c('Ag_GW_Use_Modified_Ac_Ft',
+                          'Ag_GW_Use_Comment'),
+    Commercial_GW_Use_Modified=c('Commercial_GW_Use_Modified_Ac_Ft',
+                                 'Commercial_GW_Use_Comment'),
+    Res_GW_Use_Modified=c('Res_GW_Use_Modified_Ac_Ft',
+                          'Res_GW_Use_Comment'),
+    School_Golf_Modified=c('School_Golf_GW_Use_Modified_Ac_Ft',
+                           'School_Golf_GW_Use_Comment'),
+    Urban_Irrigation_Modified=c('Urban_Irrigation_Modified_Ac_Ft',
+                                'Urban_Irrigation_GW_Use_Comment'            ))
+  x <- l[var]
+  
 
   cols = c('APN',
-           str_replace(var, "Modified", 'Modified_Ac_Ft'),
-            comment)
+           unlist(x[[1]][1]),
+           unlist(x[[1]][2]))
   
   # assigning new names to the columns of the data frame
   colnames(df) <- cols
   df[[var]] = 'Yes'
-  
+
   
   return(df)}
 
@@ -25,6 +39,7 @@ func <- function(...){
   xxx = merge(..., by = 'APN', all=TRUE)
   return(xxx)
 }
+
 
 
 load_all_modified <- function(){
