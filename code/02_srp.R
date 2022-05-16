@@ -67,7 +67,12 @@ psrp <- psrp %>% select(-all_of(rem))
 cat("Removed", length(rem), "fields from parcel database.\n   ",
     paste(rem, collapse = "\n    "))
 
+
+
 colstodrop = c(
+  'Ag_GW_Use_Modified',
+  'Ag_GW_Use_Modified_Ac_Ft',
+  'Ag_GW_Use_Comment',
   "Res_GW_Use_Modified",
   "Res_GW_Use_Modified_Ac_Ft",
   "Res_GW_Use_Comment",
@@ -78,7 +83,7 @@ colstodrop = c(
   "Urban_Irrigation_Modified_Ac_Ft",
   "Urban_Irrigation_GW_Use_Comment",
   "School_Golf_Modified",
-  "School_Golf_Modified_Ac_Ft",
+  # "School_Golf_Modified_Ac_Ft",
   "School_Golf_GW_Use_Comment")
 
 # if you want to see if these fields should be dropped, uncomment here:
@@ -89,7 +94,9 @@ colstodrop = c(
 # all fields are either null or "No' for Modified
 
 #drop the following columns
+print('removing cols')
 psrp <- select(psrp, -colstodrop)
+print('done')
 
 # ad hoc cleaning post-shelly's work --------------------------------------
 
