@@ -20,8 +20,8 @@ f_load_surface_water <- function(data_path){
   #   st_transform(epsg) %>%
   #   select(-county)
   # print('Done loading surface water data')
-  jsonpath <- path(data_path, "general/ewrims", 'Processed_water_rights',
-       'water_rights_for_GSA_20220411.geojson')
+  jsonpath <- path(data_path, "general/ewrims", 'water_rights_v2','output',
+       'water_rights_for_GSA_20220517.geojson')
   print('Loading pre-processed Water Right usages and spatial locations')
   ewrims <- jsonpath %>%
     st_read() %>%
