@@ -389,9 +389,9 @@ wsa_key <- st_join(psrp, wsa) %>%
 #     CA_DrinkingWater_SvcArea_Name == "NA", 
 #     NA, CA_DrinkingWater_SvcArea_Name))
 # 
-# psrp <- left_join(psrp, wsa_key) %>% 
-#   mutate(CA_DrinkingWater_SvcArea_Within = 
-#            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
+psrp <- left_join(psrp, wsa_key) %>%
+  mutate(CA_DrinkingWater_SvcArea_Within =
+           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
 f_verify_non_duplicates()
 
