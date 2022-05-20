@@ -926,8 +926,14 @@ ppet <- ppet %>%
       School_Golf_GW_Use_Ac_Ft + 
       Urban_Irrigation_GW_Use_Ac_Ft,
     Total_Groundwater_Use_PublicView = NA,
-    Parcel_fee = Total_Groundwater_Use_Ac_Ft*gw_use_rate
   )
+
+# set to zero parcels with less than 0.1 AF
+ppet <- mutate(ppet,Total_Groundwater_Use_Ac_Ft = 
+                 ifelse(Total_Groundwater_Use_Ac_Ft<0.1, 0,
+                        Total_Groundwater_Use_Ac_Ft),
+               Parcel_fee = Total_Groundwater_Use_Ac_Ft*gw_use_rate
+)
 
 # additional columns
 
