@@ -954,13 +954,12 @@ psrp <- psrp %>%
 psrp <- psrp %>% 
   mutate(
     Total_Groundwater_Use_Ac_Ft =
-      Res_GW_Use_Prelim_Ac_Ft + 
-      Commercial_GW_Use_Prelim_Ac_Ft + 
+      Res_GW_Use_Ac_Ft + 
+      Commercial_GW_Use_Ac_Ft + 
       Ag_GW_Use_Ac_Ft + 
       School_Golf_GW_Use_Ac_Ft + 
       Urban_Irrigation_GW_Use_Ac_Ft,
     Total_Groundwater_Use_PublicView = NA,
-    Parcel_fee = Total_Groundwater_Use_Ac_Ft*gw_use_rate
   )
 
 # set to zero parcels with less than 0.1 AF
