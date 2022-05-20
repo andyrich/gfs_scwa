@@ -389,9 +389,9 @@ wsa_key <- st_join(psrp, wsa) %>%
 #     CA_DrinkingWater_SvcArea_Name == "NA", 
 #     NA, CA_DrinkingWater_SvcArea_Name))
 # 
-# psrp <- left_join(psrp, wsa_key) %>% 
-#   mutate(CA_DrinkingWater_SvcArea_Within = 
-#            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
+psrp <- left_join(psrp, wsa_key) %>%
+  mutate(CA_DrinkingWater_SvcArea_Within =
+           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
 f_verify_non_duplicates()
 
@@ -962,6 +962,13 @@ psrp <- psrp %>%
     Total_Groundwater_Use_PublicView = NA,
     Parcel_fee = Total_Groundwater_Use_Ac_Ft*gw_use_rate
   )
+
+# set to zero parcels with less than 0.1 AF
+psrp <- mutate(psrp,Total_Groundwater_Use_Ac_Ft = 
+                ifelse(Total_Groundwater_Use_Ac_Ft<0.1, 0,
+                       Total_Groundwater_Use_Ac_Ft),
+               Parcel_fee = Total_Groundwater_Use_Ac_Ft*gw_use_rate
+               )
 
 # additional columns
 
