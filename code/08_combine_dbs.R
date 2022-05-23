@@ -51,10 +51,7 @@ all$GSA_Jurisdiction_Modified <-'No'
 all$GSA_Jurisdiction_Mod_Value <-NA
 all$GSA_Jurisdiction <-all$GSA_Jurisdiction_Prelim
 
-# set to zero parcels with less than 0.1 AF
-all <- mutate(all,Total_Groundwater_Use_Ac_Ft = 
-              ifelse(Total_Groundwater_Use_Ac_Ft<0.1, 0,
-                     Total_Groundwater_Use_Ac_Ft))
+
 
 # write to shp and csv
 print('done writing csv output')
