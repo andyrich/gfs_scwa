@@ -91,75 +91,37 @@ cat("Removed", length(rem), "fields from parcel database.\n   ",
 # we expect PET overlaps only with SRP to the north and SON to east:
 # mapview::mapview(list(son, pet, srp))
 
-# parcels that intersect multiple basins have duplicate APN across databases
-boundary_parcels_son <- ppet$APN[ppet$APN %in% pson$APN]
-boundary_parcels_srp <- ppet$APN[ppet$APN %in% psrp$APN]
-
-# boundary parcels for SON
+# # parcels that intersect multiple basins have duplicate APN across databases
+# boundary_parcels_son <- ppet$APN[ppet$APN %in% pson$APN]
+# boundary_parcels_srp <- ppet$APN[ppet$APN %in% psrp$APN]
 ppet <- ppet %>% 
   mutate(
+    # Add parcel size
+    LandSizeParcelAcres = LandSizeAcres,
     # Is the parcel a boundary parcel
-    Basin_Boundary_Parcel = ifelse(
-      APN %in% boundary_parcels_son, "Yes", "No"),
+    Basin_Boundary_Parcel = edge,
+    # Basin_Boundary_Parcel = ifelse(APN %in% boundary_parcels, "Yes", "No"),
     # area of the total APN across both GSAs is the recorded APN area
-    Intersect_GSA_Bndry_Sum_Acres = ifelse(
-      APN %in% boundary_parcels_son, LandSizeAcres, NA),
+    Intersect_GSA_Bndry_Sum_Acres = ifelse(edge =='Yes',
+                                           LandSizeAcres, NA),
     # adjust area of the bisected parcels in the GSA. remember, we clipped 
     # to the B118 basin polygon, so the area is just the calculated area!
     LandSizeAcres = ifelse(
-      APN %in% boundary_parcels_son,
+      edge =='Yes',
       as.numeric(units::set_units(st_area(geometry), acres)), 
       LandSizeAcres
     ),
-    # proportion of the APN in this GSA, used to assign a GSA
-    area_prop_apn = LandSizeAcres / Intersect_GSA_Bndry_Sum_Acres,
-    GSA_Jurisdiction_Prelim = ifelse(area_prop_apn > 0.5, 
-                                     "Petaluma Valley", "Sonoma Valley"),
-    GSA_Jurisdiction_Prelim = ifelse(is.na(GSA_Jurisdiction_Prelim), 
-                                     "Petaluma Valley", GSA_Jurisdiction_Prelim),
+    # # proportion of the APN in this GSA, used to assign a GSA
+    # area_prop_apn = LandSizeAcres / Intersect_GSA_Bndry_Sum_Acres,
+    GSA_Jurisdiction_Prelim = 'Petaluma Valley',
     # intentionally left blank for clients to evaluate and populate
     GSA_Jurisdiction_Modified = NA,
     GSA_Jurisdiction_Mod_Value = NA,
     GSA_Jurisdiction = NA
-  ) %>% 
-  # remove intermediate vars
-  select(-area_prop_apn)
-
-# boundary parcels for SRP
-ppet <- ppet %>% 
-  mutate(
-    # Is the parcel a boundary parcel
-    Basin_Boundary_Parcel = ifelse(
-      APN %in% boundary_parcels_srp, "Yes", Basin_Boundary_Parcel),
-    # area of the total APN across both GSAs is the recorded APN area
-    Intersect_GSA_Bndry_Sum_Acres = ifelse(
-      APN %in% boundary_parcels_srp, 
-      LandSizeAcres, Intersect_GSA_Bndry_Sum_Acres),
-    # adjust area of the bisected parcels in the GSA. remember, we clipped 
-    # to the B118 basin polygon, so the area is just the calculated area!
-    LandSizeAcres = ifelse(
-      APN %in% boundary_parcels_srp,
-      as.numeric(units::set_units(st_area(geometry), acres)), 
-      LandSizeAcres
-    ),
-    # proportion of the APN in this GSA, used to assign a GSA
-    area_prop_apn = LandSizeAcres / Intersect_GSA_Bndry_Sum_Acres,
-    GSA_Jurisdiction_Prelim = ifelse(
-      area_prop_apn > 0.5, 
-      "Petaluma Valley", "Santa Rosa Plain"),
-    # intentionally left blank for clients to evaluate and populate
-    GSA_Jurisdiction_Modified = NA,
-    GSA_Jurisdiction_Mod_Value = NA,
-    GSA_Jurisdiction = NA
-  ) %>% 
-  # remove intermediate vars
-  select(-area_prop_apn)
-
-# overwrite all of the above work, have default be that basin is Petaluma. Will
-# be recalculated at combine_db
-ppet <- ppet %>% 
-  mutate(GSA_Jurisdiction_Prelim = "Petaluma Valley",
-         Basin_Boundary_Parcel = edge) %>% select(-edge)
+  ) 
+# %>% 
+# # remove intermediate vars
+# select(-area_prop_apn)
 
 
 f_progress()
