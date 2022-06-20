@@ -416,14 +416,25 @@ psrp <- psrp %>%
 
 # add public water connections for modified APNs:
 apn_add_pwc <- path(data_path, "general/modified_apns.xlsx") %>% 
-  readxl::read_xlsx(sheet = 1) %>% 
-  pull(APN)
+  readxl::read_xlsx(sheet = 1) 
+
+apn_yes <- apn_add_pwc[ tolower(apn_add_pwc$Public_Water_Connection_Modified)
+                       == 'yes',] %>% pull(APN)
+
+apn_no <- apn_add_pwc[ tolower(apn_add_pwc$Public_Water_Connection_Modified)
+                       == 'no',] %>% pull(APN)
 
 psrp <- psrp %>% 
   mutate(Public_Water_Connection = ifelse(
-    APN %in% apn_add_pwc,
+    APN %in% apn_yes,
     "Yes", Public_Water_Connection)
   )
+psrp <- psrp %>% 
+  mutate(Public_Water_Connection = ifelse(
+    APN %in% apn_no,
+    "No", Public_Water_Connection)
+  )
+
 
 # # ensure public water connection is listed for specified Accessor Use Codes
 # accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
