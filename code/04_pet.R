@@ -906,7 +906,7 @@ ppet <- mutate(ppet,Total_Groundwater_Use_Ac_Ft =
 # final manual tests ------------------------------------------------------
 
 # drop no longer needed UseCode column
-ppet <- select(ppet, -UseCode)
+#ppet <- select(ppet, -UseCode)
 
 # sanity check: cols that still need to be added
 add[!add %in% colnames(ppet)]

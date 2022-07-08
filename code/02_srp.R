@@ -988,7 +988,7 @@ psrp <- mutate(psrp,Total_Groundwater_Use_Ac_Ft =
 
 # drop UseCode ------------------------------------------------------------
 
-psrp <- psrp %>% select(-UseCode)
+#psrp <- psrp %>% select(-UseCode)
 
 # final manual tests ------------------------------------------------------
 

@@ -877,7 +877,7 @@ pson <- mutate(pson,Total_Groundwater_Use_Ac_Ft =
 # final manual tests ------------------------------------------------------
 
 # drop no longer needed UseCode column
-pson <- select(pson, -UseCode)
+#pson <- select(pson, -UseCode)
 
 # sanity check: cols that still need to be added
 add[!add %in% colnames(pson)]
