@@ -33,7 +33,7 @@ psrp <- read_rds(path(data_path, "data_output/srp_parcel.rds"))
 cat("Loaded preprocedded spatial parcels from Sonoma County.\n")
 
 # final fields to use
-fields <- path(data_path, "schema/GSA Schema 20220503.xlsx") %>% 
+fields <- path(data_path, "schema/GSA Schema 20220708.xlsx") %>% 
   readxl::read_xlsx(sheet = 1, range = cellranger::cell_cols("B")) %>% 
   set_names("name") %>% 
   filter(!is.na(name)) %>% 
