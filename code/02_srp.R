@@ -22,7 +22,8 @@ gjson_out <- path(data_path, "data_output/srp_parcel_complete.rds")
 print('deleting...')
 if(file_exists(gjson_out)) file_delete(gjson_out)
 
-gw_use_rate = 1.00 #$ per AF
+gw_use_rate = 40.00 #$ per AF
+unsub_gw_sub_rate = 40. #unsubsidized rate
 
 # load data ---------------------------------------------------------------
 
@@ -34,7 +35,7 @@ psrp <- read_rds(path(data_path, "data_output/srp_parcel_shelly.rds"))
 cat("Loaded preprocedded spatial parcels from Sonoma County.\n")
 
 # final fields to use
-fields <- path(data_path, "schema/GSA Schema 20220708.xlsx") %>% 
+fields <- path(data_path, "schema/2022_07_21 GSA Schema from RP.xlsx") %>% 
   readxl::read_xlsx(sheet = 1, range = cellranger::cell_cols("B")) %>% 
   set_names("name") %>% 
   filter(!is.na(name)) %>% 
@@ -976,7 +977,9 @@ psrp <- psrp %>%
 psrp <- mutate(psrp,Total_Groundwater_Use_Ac_Ft = 
                 ifelse(Total_Groundwater_Use_Ac_Ft<0.1, 0,
                        Total_Groundwater_Use_Ac_Ft),
-               Parcel_fee = Total_Groundwater_Use_Ac_Ft*gw_use_rate
+               Parcel_fee = Total_Groundwater_Use_Ac_Ft*unsub_gw_sub_rate,
+               Fee_Rate = gw_use_rate,
+               Parcel_Fee_Subsidized = Total_Groundwater_Use_Ac_Ft*gw_use_rate
                )
 
 # additional columns

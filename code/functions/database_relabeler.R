@@ -10,7 +10,7 @@ relable_parc <- function(parc){
   #   select(c('Field_Name', 'Field_Name_PRMD'))
   
   s_ <- path(data_path, "schema", 
-             'GSA Schema 20220708.xlsx')
+             '2022_07_21 GSA Schema from RP.xlsx')
   print('Loading pre-processed list of urban wells')
   schema <- s_ %>%
     readxl::read_xlsx(sheet = 'Sheet1')
