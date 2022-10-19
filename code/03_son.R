@@ -71,9 +71,13 @@ pson <- pson %>%
     MailingAddress1     = MailAdr1,
     MailingAddress2     = MailAdr2,
     MailingAddress3     = MailAdr3,
-    MailingAddress4     = MailAdr4)
+    MailingAddress4     = MailAdr4,
+    Situs_Address       = SitusFmt1)
 f_progress()
 
+pson <- pson %>%
+  mutate(Jurisdiction = ifelse(CityType == 'Incorporated',
+                               POCity, 'Unincorporated Sonoma County'))
 
 # remove fields -----------------------------------------------------------
 
@@ -264,6 +268,14 @@ wsa_key <- st_join(pson, wsa) %>%
 pson <- left_join(pson, wsa_key) %>% 
   mutate(CA_DrinkingWater_SvcArea_Within = 
            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
+
+pson <- pson %>%
+  mutate(CA_DrinkingWater_SvcArea_Name = 
+           ifelse(Jurisdiction == 'Sonoma', "Yes", CA_DrinkingWater_SvcArea_Within),
+          CA_DrinkingWater_SvcArea_Within =
+           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
+
+
 
 f_verify_non_duplicates()
 

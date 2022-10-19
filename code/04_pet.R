@@ -73,8 +73,14 @@ ppet <- ppet %>%
     MailingAddress1     = MailAdr1,
     MailingAddress2     = MailAdr2,
     MailingAddress3     = MailAdr3,
-    MailingAddress4     = MailAdr4)
+    MailingAddress4     = MailAdr4,
+    Situs_Address       = SitusFmt1)
+
 f_progress()
+
+ppet <- ppet %>%
+  mutate(Jurisdiction = ifelse(CityType == 'Incorporated',
+                               POCity, 'Unincorporated Sonoma County'))
 
 ### add parcel land size
 # ppet <- load_land_size(data_path, ppet)

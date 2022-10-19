@@ -52,7 +52,6 @@ all$GSA_Jurisdiction_Mod_Value <-NA
 all$GSA_Jurisdiction <-all$GSA_Jurisdiction_Prelim
 
 
-
 # write to shp and csv
 print('done writing csv output')
 all %>% 
