@@ -51,10 +51,6 @@ all$GSA_Jurisdiction_Modified <-'No'
 all$GSA_Jurisdiction_Mod_Value <-NA
 all$GSA_Jurisdiction <-all$GSA_Jurisdiction_Prelim
 
-Parcel_fee
-Fee_Rate
-Parcel_Fee_Subsidized
-
 
 # write to shp and csv
 print('done writing csv output')

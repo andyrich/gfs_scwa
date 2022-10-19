@@ -74,7 +74,7 @@ ppet <- ppet %>%
     MailingAddress2     = MailAdr2,
     MailingAddress3     = MailAdr3,
     MailingAddress4     = MailAdr4,
-    Situs               = SitusFmt1)
+    Situs_Address       = SitusFmt1)
 
 f_progress()
 
