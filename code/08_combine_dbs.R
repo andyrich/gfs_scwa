@@ -51,6 +51,22 @@ all$GSA_Jurisdiction_Modified <-'No'
 all$GSA_Jurisdiction_Mod_Value <-NA
 all$GSA_Jurisdiction <-all$GSA_Jurisdiction_Prelim
 
+parcel_old <- path(
+  data_path, "data_output/archive/output_as_of_10192022/soco_gsas_parcel.csv")
+
+print(parcel_old)
+# find if values have been changed for the 'Updated_value' field
+old <- read_csv(parcel_old, col_select = c('APN', 'Total_Groundwater_Use_Ac_Ft'))
+
+old <- old %>%
+  select( APN, Total_Groundwater_Use_Ac_Ft ) %>%
+          rename(Total_GW_old = Total_Groundwater_Use_Ac_Ft)
+print(colnames(old))
+
+all <- left_join(all, old, by='APN') %>% 
+            mutate(Updated_Value = 
+           ifelse(Total_Groundwater_Use_Ac_Ft == Total_GW_old, "No", "Yes")) %>%
+            select(-Total_GW_old)
 
 # write to shp and csv
 print('done writing csv output')
