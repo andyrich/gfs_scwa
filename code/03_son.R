@@ -7,6 +7,7 @@ library(fs)
 library(tidylog, warn.conflicts = FALSE)
 library(mapview)
 
+
 dir_ls(here("code/functions")) %>% walk(~source(.x))
 f_load_dotenv() 
 
@@ -240,10 +241,11 @@ f_verify_non_duplicates()
 wsa <- path(data_path, "general", "water_system_boundaries",
             "SABL_Public_083121/SABL_Public_083121.shp") %>% 
   st_read() %>% 
-  st_transform(epsg) %>% 
+  st_transform(epsg)  %>%
+  filter(WATER_SY_1 != "SONOMA, CITY OF"  ) %>% 
   st_intersection(son) %>% 
   select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1,
-         pwsid = SABL_PWSID)
+         pwsid = SABL_PWSID) 
 
 # sanity check
 # mapview(pet) + mapview(wsa)
@@ -263,33 +265,43 @@ wsa_key <- st_join(pson, wsa) %>%
   # coerce character "NA" to NA
   mutate(CA_DrinkingWater_SvcArea_Name = ifelse(
     CA_DrinkingWater_SvcArea_Name == "NA", 
-    NA, CA_DrinkingWater_SvcArea_Name))
+    NA, CA_DrinkingWater_SvcArea_Name)) 
 
 pson <- left_join(pson, wsa_key) %>% 
   mutate(CA_DrinkingWater_SvcArea_Within = 
            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
-pson <- pson %>%
-  mutate(CA_DrinkingWater_SvcArea_Name = 
-           ifelse(Jurisdiction == 'Sonoma', "Yes", CA_DrinkingWater_SvcArea_Within),
-          CA_DrinkingWater_SvcArea_Within =
-           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
+#pson <- pson %>%
+#  mutate(CA_DrinkingWater_SvcArea_Name = 
+#           ifelse(Jurisdiction == 'Sonoma', "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
+#          CA_DrinkingWater_SvcArea_Within =
+#           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
 
 
 f_verify_non_duplicates()
 
 # add explicit connection data from City of Sonoma
-# path_sonoma_city <- path(
-#   data_path, "son/public_water_connection/city_of_sonoma",
-#   "Sonoma City Water Service Connections within the GSA.xlsx")
-# 
-# connections_sonoma_city <- xlsx::read.xlsx(path_sonoma_city, 
-#                                            sheetIndex = 1, 
-#                                            colIndex = c(9, 14)) %>% 
-#   select(APN = `APN.Dash`, has_res_service = `Has.Res.Service`) %>% 
-#   # NA values are stored as " "
-#   filter(has_res_service != " ")
+path_sonoma_city <- path(
+  data_path, "son/public_water_connection/city_of_sonoma",
+  "Sonoma City Water Service Connections within the GSA.xlsx")
+
+connections_sonoma_city <- readxl::read_xlsx(path_sonoma_city,
+                                             sheet  = 1,) %>%
+   select(APN = `APN Dash`, has_res_service = `Has Res Service`) %>%
+   # NA values are stored as " "
+   filter(has_res_service != " ")
+
+
+pson <- pson %>%
+  mutate(
+    CA_DrinkingWater_SvcArea_Within =
+      ifelse(APN %in% connections_sonoma_city$APN, "Yes", CA_DrinkingWater_SvcArea_Within),
+    CA_DrinkingWater_SvcArea_Name =
+      ifelse(APN %in% connections_sonoma_city$APN, "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
+  )
+
+
 
 # add explicit connection data from VOMWD
 # path_vomwd <- path(
@@ -309,6 +321,8 @@ f_verify_non_duplicates()
 shelly_path <- path(data_path, "general", "address_apn.gdb")
 cat("Reading in explicit connection data for:\n", 
     paste(rgdal::ogrListLayers(shelly_path), collapse = "\n "))
+
+
 
 connections_shelly <- rgdal::ogrListLayers(shelly_path) %>% 
   purrr::map_df(
