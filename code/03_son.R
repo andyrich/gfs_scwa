@@ -282,23 +282,18 @@ pson <- left_join(pson, wsa_key) %>%
 f_verify_non_duplicates()
 
 # add explicit connection data from City of Sonoma
-path_sonoma_city <- path(
-  data_path, "son/public_water_connection/city_of_sonoma",
-  "Sonoma City Water Service Connections within the GSA.xlsx")
+path_sonoma_city <- path(data_path, 
+    "son/public_water_connection/city_of_sonoma/Sonoma_City_connections_10202022.dbf")
 
-connections_sonoma_city <- readxl::read_xlsx(path_sonoma_city,
-                                             sheet  = 1,) %>%
-   select(APN = `APN Dash`, has_res_service = `Has Res Service`) %>%
-   # NA values are stored as " "
-   filter(has_res_service != " ")
-
+connections_sonoma_city <- st_read(path_sonoma_city ) %>%
+  select(APNDash) 
 
 pson <- pson %>%
   mutate(
     CA_DrinkingWater_SvcArea_Within =
-      ifelse(APN %in% connections_sonoma_city$APN, "Yes", CA_DrinkingWater_SvcArea_Within),
+      ifelse(APN %in% connections_sonoma_city$APNDash, "Yes", CA_DrinkingWater_SvcArea_Within),
     CA_DrinkingWater_SvcArea_Name =
-      ifelse(APN %in% connections_sonoma_city$APN, "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
+      ifelse(APN %in% connections_sonoma_city$APNDash, "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
   )
 
 
