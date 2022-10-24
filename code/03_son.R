@@ -150,9 +150,9 @@ f_progress()
 
 # recycled water delivered to parcels in 2016 (from billy.dixon@scwa.ca.gov)
 recy <- path(data_path, 
-             "son/recycled_water/SVCSD Recycled Water Use APNs.xlsx") %>% 
-  readxl::read_xlsx(sheet = 4) %>% 
-  rename(Recycled_Water_Use_Ac_Ft = af_yr_2016)
+             "son/recycled_water/Recycled Water Revisions.xlsx") %>% 
+  readxl::read_xlsx(sheet = 1) %>% 
+  rename(APN = Parcel, Recycled_Water_Use_Ac_Ft = Recycled_AF)
 
 # add recycled water parcels to parcel data
 pson <- left_join(pson, recy, by = "APN") %>% 
