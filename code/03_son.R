@@ -271,35 +271,49 @@ pson <- left_join(pson, wsa_key) %>%
   mutate(CA_DrinkingWater_SvcArea_Within = 
            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
-#pson <- pson %>%
-#  mutate(CA_DrinkingWater_SvcArea_Name = 
-#           ifelse(Jurisdiction == 'Sonoma', "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
-#          CA_DrinkingWater_SvcArea_Within =
-#           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
+pson <- pson %>%
+ mutate(CA_DrinkingWater_SvcArea_Name =
+          ifelse(Jurisdiction == 'Sonoma', "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
+         CA_DrinkingWater_SvcArea_Within =
+          ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
+# get centroid of city of sonoma parcels provided by 0. hart on 10/20/2022
+# find parcels that overlie these parcels, and then set them as city of sonom water connecetd parcels
+# COS data is not usable as was provided because APN values were randomly switched.
+p <- path(data_path, "son/public_water_connection/city_of_sonoma/City_son_connects.shp")
+son_connect <- st_read(p) %>%
+  st_transform(epsg)  %>%
+  st_centroid() %>% 
+  select(APNDash)
 
-
-f_verify_non_duplicates()
-
-# add explicit connection data from City of Sonoma
-path_sonoma_city <- path(
-  data_path, "son/public_water_connection/city_of_sonoma",
-  "Sonoma City Water Service Connections within the GSA.xlsx")
-
-connections_sonoma_city <- readxl::read_xlsx(path_sonoma_city,
-                                             sheet  = 1,) %>%
-   select(APN = `APN Dash`, has_res_service = `Has Res Service`) %>%
-   # NA values are stored as " "
-   filter(has_res_service != " ")
-
+son_connect <- st_join(son_connect, pson)%>% 
+    st_drop_geometry() %>% 
+    select(APN)
 
 pson <- pson %>%
   mutate(
     CA_DrinkingWater_SvcArea_Within =
-      ifelse(APN %in% connections_sonoma_city$APN, "Yes", CA_DrinkingWater_SvcArea_Within),
+      ifelse(APN %in% son_connect$APN, "Yes", CA_DrinkingWater_SvcArea_Within),
     CA_DrinkingWater_SvcArea_Name =
-      ifelse(APN %in% connections_sonoma_city$APN, "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
+      ifelse(APN %in% son_connect$APN, "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
   )
+
+f_verify_non_duplicates()
+
+# # add explicit connection data from City of Sonoma
+# path_sonoma_city <- path(data_path, 
+#     "son/public_water_connection/city_of_sonoma/Sonoma_City_connections_10202022.dbf")
+# 
+# connections_sonoma_city <- st_read(path_sonoma_city ) %>%
+#   select(APNDash) 
+# 
+# pson <- pson %>%
+#   mutate(
+#     CA_DrinkingWater_SvcArea_Within =
+#       ifelse(APN %in% connections_sonoma_city$APNDash, "Yes", CA_DrinkingWater_SvcArea_Within),
+#     CA_DrinkingWater_SvcArea_Name =
+#       ifelse(APN %in% connections_sonoma_city$APNDash, "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
+#   )
 
 
 

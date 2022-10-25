@@ -65,8 +65,8 @@ print(colnames(old))
 
 all <- left_join(all, old, by='APN') %>% 
             mutate(Updated_Value = 
-           ifelse(Total_Groundwater_Use_Ac_Ft == Total_GW_old, "No", "Yes")) %>%
-            select(-Total_GW_old)
+           ifelse(Total_Groundwater_Use_Ac_Ft == Total_GW_old, "No", "Yes"))
+
 
 # write to shp and csv
 print('done writing csv output')
