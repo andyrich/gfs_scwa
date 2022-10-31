@@ -271,24 +271,18 @@ pson <- left_join(pson, wsa_key) %>%
   mutate(CA_DrinkingWater_SvcArea_Within = 
            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
-pson <- pson %>%
- mutate(CA_DrinkingWater_SvcArea_Name =
-          ifelse(Jurisdiction == 'Sonoma', "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
-         CA_DrinkingWater_SvcArea_Within =
-          ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
+# pson <- pson %>%
+#  mutate(CA_DrinkingWater_SvcArea_Name =
+#           ifelse(Jurisdiction == 'Sonoma', "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
+#          CA_DrinkingWater_SvcArea_Within =
+#           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
-# get centroid of city of sonoma parcels provided by 0. hart on 10/20/2022
-# find parcels that overlie these parcels, and then set them as city of sonom water connecetd parcels
-# COS data is not usable as was provided because APN values were randomly switched.
-p <- path(data_path, "son/public_water_connection/city_of_sonoma/City_son_connects.shp")
+# get edited list of APN's of city of sonoma parcels provided by 0. hart on 10/20/2022
+p <- path(data_path, "son/public_water_connection/city_of_sonoma/city_son_modified_values/city_son_mod.shp")
 son_connect <- st_read(p) %>%
-  st_transform(epsg)  %>%
-  st_centroid() %>% 
-  select(APNDash)
+  filter(Connected =='Yes') %>%
+  select(APN)
 
-son_connect <- st_join(son_connect, pson)%>% 
-    st_drop_geometry() %>% 
-    select(APN)
 
 pson <- pson %>%
   mutate(
@@ -297,6 +291,27 @@ pson <- pson %>%
     CA_DrinkingWater_SvcArea_Name =
       ifelse(APN %in% son_connect$APN, "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
   )
+
+# get centroid of city of sonoma parcels provided by 0. hart on 10/20/2022
+# find parcels that overlie these parcels, and then set them as city of sonom water connecetd parcels
+# # COS data is not usable as was provided because APN values were randomly switched.
+# p <- path(data_path, "son/public_water_connection/city_of_sonoma/City_son_connects.shp")
+# son_connect <- st_read(p) %>%
+#   st_transform(epsg)  %>%
+#   st_centroid() %>% 
+#   select(APNDash)
+# 
+# son_connect <- st_join(son_connect, pson)%>% 
+#     st_drop_geometry() %>% 
+#     select(APN)
+# 
+# pson <- pson %>%
+#   mutate(
+#     CA_DrinkingWater_SvcArea_Within =
+#       ifelse(APN %in% son_connect$APN, "Yes", CA_DrinkingWater_SvcArea_Within),
+#     CA_DrinkingWater_SvcArea_Name =
+#       ifelse(APN %in% son_connect$APN, "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
+#   )
 
 f_verify_non_duplicates()
 
