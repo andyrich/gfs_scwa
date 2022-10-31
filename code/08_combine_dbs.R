@@ -64,8 +64,10 @@ old <- old %>%
 print(colnames(old))
 
 all <- left_join(all, old, by='APN') %>% 
+            mutate(Change_in_GW = Total_GW_old - Total_Groundwater_Use_Ac_Ft) %>%
             mutate(Updated_Value = 
-           ifelse(Total_Groundwater_Use_Ac_Ft == Total_GW_old, "No", "Yes"))
+           ifelse(abs(Change_in_GW)>.05, "Yes", "No")) %>%
+          select(-Change_in_GW)
 
 
 # write to shp and csv
