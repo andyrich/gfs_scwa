@@ -148,11 +148,15 @@ f_progress()
 ## recycled water ---------------------------------------------------------
 # load delivery data from recycled water treatment plants
 
-# recycled water delivered to parcels in 2016 (from billy.dixon@scwa.ca.gov)
+# recycled water delivered to parcels. from SCI 11/1/2022
 recy <- path(data_path, 
-             "son/recycled_water/Recycled Water Revisions.xlsx") %>% 
-  readxl::read_xlsx(sheet = 1) %>% 
-  rename(APN = Parcel, Recycled_Water_Use_Ac_Ft = Recycled_AF)
+             "son/recycled_water/updated_rw_totals_all_basins.csv") %>% 
+  read_csv() %>% 
+  mutate(APN = str_remove(parcel, '-000'))  %>%
+  rename(Recycled_Water_Use_Ac_Ft = recycle_af) %>%
+  filter(Recycled_Water_Use_Ac_Ft>0) %>%
+  select(-parcel)
+
 
 # add recycled water parcels to parcel data
 pson <- left_join(pson, recy, by = "APN") %>% 
@@ -242,7 +246,6 @@ wsa <- path(data_path, "general", "water_system_boundaries",
             "SABL_Public_083121/SABL_Public_083121.shp") %>% 
   st_read() %>% 
   st_transform(epsg)  %>%
-  filter(WATER_SY_1 != "SONOMA, CITY OF"  ) %>% 
   st_intersection(son) %>% 
   select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1,
          pwsid = SABL_PWSID) 
@@ -278,9 +281,15 @@ pson <- left_join(pson, wsa_key) %>%
 #           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
 # get edited list of APN's of city of sonoma parcels provided by 0. hart on 10/20/2022
+# this would keep only parcels with manually edited parcels in db
+# p <- path(data_path, "son/public_water_connection/city_of_sonoma/city_son_modified_values/city_son_mod.shp")
+# son_connect <- st_read(p) %>%
+#   filter(Connected =='Yes') %>%
+#   select(APN)
+
+# get edited list of APN's of city of sonoma parcels provided by 0. hart on 10/20/2022
 p <- path(data_path, "son/public_water_connection/city_of_sonoma/city_son_modified_values/city_son_mod.shp")
 son_connect <- st_read(p) %>%
-  filter(Connected =='Yes') %>%
   select(APN)
 
 
