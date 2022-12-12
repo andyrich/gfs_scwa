@@ -192,12 +192,18 @@ f_progress()
 
 psrp$Recycled_Water_Use_Ac_Ft <- NULL
 
-# loading recycled water data from the Raftellis database
-recycled_water_path <- path(data_path, "srp", "recycled_water",
-                          "Recycled Water Revisions.xlsx")
-recy <- readxl::read_xlsx(recycled_water_path, sheet = 1) %>%
-  select(APN = Parcel,
-         Recycled_Water_Use_Ac_Ft = Recycled_AF)
+
+## recycled water ---------------------------------------------------------
+# load delivery data from recycled water treatment plants
+
+# recycled water delivered to parcels. from SCI 11/1/2022
+recy <- path(data_path, 
+             "srp/recycled_water/updated_rw_totals_all_basins.csv") %>% 
+  read_csv() %>% 
+  mutate(APN = str_remove(parcel, '-000'))  %>%
+  rename(Recycled_Water_Use_Ac_Ft = recycle_af) %>%
+  filter(Recycled_Water_Use_Ac_Ft>0) %>%
+  select(-parcel)
 
 # add recycled water parcels to parcel data
 psrp <- left_join(psrp, recy, by = "APN") %>%
