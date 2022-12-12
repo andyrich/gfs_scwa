@@ -194,10 +194,10 @@ psrp$Recycled_Water_Use_Ac_Ft <- NULL
 
 # loading recycled water data from the Raftellis database
 recycled_water_path <- path(data_path, "srp", "recycled_water",
-                          "srp_recycled_water.xlsx")
+                          "Recycled Water Revisions.xlsx")
 recy <- readxl::read_xlsx(recycled_water_path, sheet = 1) %>%
-  select(APN,
-         Recycled_Water_Use_Ac_Ft = Value)
+  select(APN = Parcel,
+         Recycled_Water_Use_Ac_Ft = Recycled_AF)
 
 # add recycled water parcels to parcel data
 psrp <- left_join(psrp, recy, by = "APN") %>%
