@@ -51,13 +51,12 @@ yearly[is.na(yearly)] <- 0
 
 yearly$MEAN_GSA_DIVERSION <- rowMeans(yearly[-1])
 
-print(colnames(yearly))
-print(yearly)
-print(sum(yearly$MEAN_GSA_DIVERSION))
-asdf
+
+
+
 summary <- yearly %>%select(MEAN_GSA_DIVERSION)
 
-print(colnames(summary))
+print(sum(yearly$MEAN_GSA_DIVERSION))
 print(summary)
 
 
