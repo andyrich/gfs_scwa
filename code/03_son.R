@@ -167,17 +167,7 @@ f_progress()
 
 ## surface water connection -----------------------------------------------
 # read ewrims data, filter to SON, transform, select relevant cols
-ewrims <- f_load_surface_water(data_path)
-
-# add surface water use (AF/year) to parcels, but be careful, as some 
-# parcels have MULTIPLE ewrims points and these must be summarized
-ewrims_key <- st_join(select(pson, APN), ewrims) %>% 
-  st_drop_geometry() %>% 
-  group_by(APN) %>% 
-  summarise(Surface_Water_Use_Ac_Ft = sum(
-    Surface_Water_Use_Ac_Ft, na.rm = TRUE)
-  ) %>% 
-  ungroup()
+ewrims_key <- f_load_surface_water(data_path)
 
 pson <- left_join(pson, ewrims_key) %>% 
   mutate(Surface_Water_Connection = ifelse(
