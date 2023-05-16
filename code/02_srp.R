@@ -248,22 +248,23 @@ f_progress()
 #   st_as_sf(coords = c("longitude", "latitude"), crs = 4269) %>%
 #   st_transform(epsg) %>%
 #   select(-county)
-ewrims <- f_load_surface_water(data_path)
+ewrims_key <- f_load_surface_water(data_path)
 
-ewrims_out <- path(data_path, "general/ewrims/exported_water_rights.geojson")
-if(file_exists(ewrims_out)) file_delete(ewrims_out)
-st_write(ewrims, ewrims_out)
-print('done writing water rights')
-
-# add surface water use (AF/year) to parcels, but be careful, as some
-# parcels have MULTIPLE ewrims points and these must be summarized
-ewrims_key <- st_join(select(psrp, APN), ewrims) %>%
-  st_drop_geometry() %>%
-  group_by(APN) %>%
-  summarise(Surface_Water_Use_Ac_Ft = sum(
-    Surface_Water_Use_Ac_Ft, na.rm = TRUE)
-  ) %>%
-  ungroup()
+# 
+# ewrims_out <- path(data_path, "general/ewrims/exported_water_rights.geojson")
+# if(file_exists(ewrims_out)) file_delete(ewrims_out)
+# st_write(ewrims, ewrims_out)
+# print('done writing water rights')
+# 
+# # add surface water use (AF/year) to parcels, but be careful, as some
+# # parcels have MULTIPLE ewrims points and these must be summarized
+# ewrims_key <- st_join(select(psrp, APN), ewrims) %>%
+#   st_drop_geometry() %>%
+#   group_by(APN) %>%
+#   summarise(Surface_Water_Use_Ac_Ft = sum(
+#     Surface_Water_Use_Ac_Ft, na.rm = TRUE)
+#   ) %>%
+#   ungroup()
 
 
 #remove columns Surface_Water_Connection and Surface_Water_Use_Ac_Ft
@@ -273,6 +274,7 @@ psrp <- left_join(psrp, ewrims_key) %>%
   mutate(Surface_Water_Connection = ifelse(
     !is.na(Surface_Water_Use_Ac_Ft) & Surface_Water_Use_Ac_Ft > 0,
     "Yes", "No"))
+
 f_progress()
 f_verify_non_duplicates()
 print('done loading surface water data')
