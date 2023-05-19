@@ -421,6 +421,9 @@ res_use_accessor_key <- readxl::read_xlsx(accessor_key_path,
          Res_W_Use_Assessor_Ac_Ft = residential_use, 
          Commercial_W_Use_Assessor_Ac_Ft = commercial_industrial_misc_use)
 
+#TODO check UseCode Modified option
+ppet <- replace_use_code(ppet)
+
 # add Residential and Commercial Water Use based on Accessor Code
 ppet <- left_join(ppet, res_use_accessor_key) 
 

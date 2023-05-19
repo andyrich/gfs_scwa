@@ -567,8 +567,12 @@ res_use_accessor_key <- readxl::read_xlsx(accessor_key_path,
 psrp <- psrp %>% 
   select(-all_of(c("Res_W_Use_Assessor_Ac_Ft",
                    "Commercial_W_Use_Assessor_Ac_Ft")))
-psrp <- left_join(psrp, res_use_accessor_key)
 
+#TODO add UseCode Modified option
+replace_use_code(psrp)
+
+psrp <- left_join(psrp, res_use_accessor_key)
+asdf
 # Res_GW_Use_Prelim_Ac_Ft is Res_W_Use_Assessor_Ac_Ft if
 # there's no public water connection, otherwise, it's 0
 psrp <- psrp %>%
@@ -580,6 +584,7 @@ psrp <- psrp %>%
 
 # load modified fields
 psrp <- join_with_modified(psrp)
+
 
 # blank fields to permit revision of the data
 psrp <- psrp %>%
