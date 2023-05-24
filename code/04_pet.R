@@ -530,6 +530,8 @@ ppet <- ppet %>%
       Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
 #Todo Remove '&Public_Water_connection=='Yes' in order remove requirement that parcel has PWC and a well
 
+ppet <- add_urban_irrigation_modified(ppet)
+
 # blank fields to permit revision of the data
 ppet <- ppet %>% 
   mutate(

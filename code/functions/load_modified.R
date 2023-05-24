@@ -11,6 +11,8 @@ load_modified_single <- function(sheetname, col1, col2){
   colnames(df) <- c('APN', unlist(col1), unlist(col2))
   df[[sheetname]] = 'Yes'
   
+  #extra row with APN='APN' is being added. so removing here.
+  df <- filter(df,!df$APN=='APN')
   print(colnames(df))
   
   return(df)}
@@ -112,3 +114,15 @@ replace_use_code <- function(parcel) {
   
   return(parcel)
 }
+
+add_urban_irrigation_modified <- function(parcel) {
+  
+  df <- load_modified_single('Urban_Irrigation_Modified', 'Urban_Irrigation_GW_Use_Modified_Ac_Ft', 'Urban_Irrigation_Comment')
+  print(class(df))
+
+  parcel <- left_join(parcel, df)
+
+  return(parcel)
+}
+
+  

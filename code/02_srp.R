@@ -568,11 +568,11 @@ psrp <- psrp %>%
   select(-all_of(c("Res_W_Use_Assessor_Ac_Ft",
                    "Commercial_W_Use_Assessor_Ac_Ft")))
 
-#TODO add UseCode Modified option
-replace_use_code(psrp)
+#TODO check UseCode Modified option
+psrp <- replace_use_code(psrp)
 
 psrp <- left_join(psrp, res_use_accessor_key)
-asdf
+
 # Res_GW_Use_Prelim_Ac_Ft is Res_W_Use_Assessor_Ac_Ft if
 # there's no public water connection, otherwise, it's 0
 psrp <- psrp %>%
@@ -634,7 +634,9 @@ psrp <- psrp %>%
   mutate(
     Urban_Irrigation_GW_Use_Prelim_Ac_Ft = ifelse(
       Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
-# 
+
+psrp <- add_urban_irrigation_modified(psrp)
+
 # # blank fields to permit revision of the data
 psrp <- psrp %>%
   mutate(
@@ -642,7 +644,8 @@ psrp <- psrp %>%
            Urban_Irrigation_Modified == "Yes",
            Urban_Irrigation_GW_Use_Modified_Ac_Ft,
            Urban_Irrigation_GW_Use_Prelim_Ac_Ft))
-# 
+
+
 # f_progress()
 # f_verify_non_duplicates()
 

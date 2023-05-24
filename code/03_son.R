@@ -561,6 +561,8 @@ pson <- pson %>%
     Urban_Irrigation_GW_Use_Prelim_Ac_Ft = ifelse(
       Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
 
+pson <- add_urban_irrigation_modified(pson)
+
 # blank fields to permit revision of the data
 pson <- pson %>% 
   mutate(
