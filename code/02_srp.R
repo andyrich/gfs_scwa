@@ -210,6 +210,8 @@ psrp <- left_join(psrp, recy, by = "APN") %>%
   mutate(Recycled_Water_Connection = ifelse(
     !is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No"))
 
+
+
 print('here is the sum of the recycled water')
 print(psrp %>%
           st_drop_geometry() %>%
@@ -274,6 +276,8 @@ psrp <- left_join(psrp, ewrims_key) %>%
   mutate(Surface_Water_Connection = ifelse(
     !is.na(Surface_Water_Use_Ac_Ft) & Surface_Water_Use_Ac_Ft > 0,
     "Yes", "No"))
+
+psrp <- add_surface_water_modified(psrp)
 
 f_progress()
 f_verify_non_duplicates()

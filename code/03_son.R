@@ -173,6 +173,9 @@ pson <- left_join(pson, ewrims_key) %>%
   mutate(Surface_Water_Connection = ifelse(
     !is.na(Surface_Water_Use_Ac_Ft) & Surface_Water_Use_Ac_Ft > 0, 
     "Yes", "No"))
+
+pson <- add_surface_water_modified(pson)
+
 f_progress()
 f_verify_non_duplicates()
 

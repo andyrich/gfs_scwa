@@ -174,6 +174,9 @@ ppet <- left_join(ppet, ewrims_key) %>%
   mutate(Surface_Water_Connection = ifelse(
     !is.na(Surface_Water_Use_Ac_Ft) & Surface_Water_Use_Ac_Ft > 0, 
     "Yes", "No"))
+
+ppet <- add_surface_water_modified(ppet)
+
 f_progress()
 f_verify_non_duplicates()
 

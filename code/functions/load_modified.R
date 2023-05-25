@@ -116,13 +116,31 @@ replace_use_code <- function(parcel) {
 }
 
 add_urban_irrigation_modified <- function(parcel) {
-  
+  print('loading urban irrigation modified')
   df <- load_modified_single('Urban_Irrigation_Modified', 'Urban_Irrigation_GW_Use_Modified_Ac_Ft', 'Urban_Irrigation_Comment')
-  print(class(df))
+
 
   parcel <- left_join(parcel, df)
 
   return(parcel)
 }
 
+add_surface_water_modified <- function(parcel) {
+  print('loading surface water modified')
+  df <- load_modified_single('Surface_Water_Use_Modified', 'Surface_Water_Use_Modified_Ac_Ft', 'Surface_Water_Comment')
+
+  df <-   mutate(df, 
+             Surface_Water_Connection = ifelse(
+            !is.na(Surface_Water_Use_Modified_Ac_Ft) & Surface_Water_Use_Modified_Ac_Ft > 0,
+            "Yes", "No"))
+  
+  parcel <- left_join(parcel, df) %>%
+    mutate(Surface_Water_Use_Modified = ifelse(is.na(Surface_Water_Use_Modified),'No','Yes'),
+           Surface_Water_Use_Ac_Ft_prelim = Surface_Water_Use_Ac_Ft, 
+           Surface_Water_Use_Ac_Ft = if_else(Surface_Water_Use_Modified=='Yes', 
+                                             Surface_Water_Use_Modified_Ac_Ft, 
+                                             Surface_Water_Use_Ac_Ft_prelim)) 
+  
+  return(parcel)
+}
   
