@@ -162,6 +162,11 @@ recy <- path(data_path,
 pson <- left_join(pson, recy, by = "APN") %>% 
   mutate(Recycled_Water_Connection = ifelse(
     !is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No"))
+
+pson <- add_recycled_water_modified(pson)
+
+pson <- add_recycled_water_connection_modified(pson)
+
 f_progress()
 
 

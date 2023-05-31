@@ -162,6 +162,11 @@ ppet <- left_join(ppet, recy, by = "APN") %>%
   mutate(Recycled_Water_Connection = ifelse(
     !is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No")
   )
+
+ppet <- add_recycled_water_modified(ppet)
+
+ppet <- add_recycled_water_connection_modified(ppet)
+
 f_progress()
 f_verify_non_duplicates()
 

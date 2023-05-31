@@ -212,12 +212,21 @@ psrp <- left_join(psrp, recy, by = "APN") %>%
 
 
 
-print('here is the sum of the recycled water')
+print('here is the sum of the recycled water before adding modified')
 print(psrp %>%
           st_drop_geometry() %>%
           select(Recycled_Water_Use_Ac_Ft)  %>%
           colSums(na.rm = TRUE))
 
+psrp <- add_recycled_water_modified(psrp)
+
+psrp <- add_recycled_water_connection_modified(psrp)
+
+print('here is the sum of the recycled water after adding modified')
+print(psrp %>%
+        st_drop_geometry() %>%
+        select(Recycled_Water_Use_Ac_Ft)  %>%
+        colSums(na.rm = TRUE))
 
 # recycled water delivered to parcels in 2016 (from billy.dixon@scwa.ca.gov)
 # recy <- path(data_path, 
