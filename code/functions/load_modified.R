@@ -56,10 +56,10 @@ load_all_modified <- function(){
   df2 = load_modified_single(names(h[2]),h[2][1], h[2][2])
   df3 = load_modified_single(names(h[3]),h[3][1], h[3][2])
   df4 = load_modified_single(names(h[4]),h[4][1], h[4][2])
-  df5 = load_modified_single(names(h[5]),h[5][1], h[5][2])
-  df6 = load_modified_single(names(h[6]),h[6][1], h[6][2])
-  df7 = load_modified_single(names(h[7]),h[7][1], h[7][2])
-  df8 = load_modified_single(names(h[8]),h[8][1], h[8][2])
+  # df5 = load_modified_single(names(h[5]),h[5][1], h[5][2])
+  # df6 = load_modified_single(names(h[6]),h[6][1], h[6][2])
+  # df7 = load_modified_single(names(h[7]),h[7][1], h[7][2])
+  # df8 = load_modified_single(names(h[8]),h[8][1], h[8][2])
   
   df = list(df1, df2, df3, df4)
   # df = list(df1, df2, df3, df4, df5,  df6, df7, df8)
@@ -93,12 +93,6 @@ join_with_modified <- function(parcel){
 }
 
 
-replace_with_modified <- function(parcel,original_column, modified_column, comment_column){
-  
-
-  
-}
-
 replace_use_code <- function(parcel) {
   
   df <- load_modified_single('UseCode_Modified', 'UseCode_Modified_Value', 'UseCode_Comment')
@@ -128,7 +122,7 @@ add_urban_irrigation_modified <- function(parcel) {
 add_surface_water_connection_modified <- function(parcel) {
   print('loading surface water connection')
   df <- load_modified_single('Surface_Water_Connection_Modified', 'Surface_Water_Connection_Modified_Value', 'Surface_Water_Connection_Modified_Comment')
-  print(df)
+
   parcel <- left_join(parcel, df) %>%
     mutate(Surface_Water_Connection_Prelim = Surface_Water_Connection,
            Surface_Water_Connection = if_else(!is.na(Surface_Water_Connection_Modified),
@@ -162,3 +156,40 @@ add_surface_water_modified <- function(parcel) {
   return(parcel)
 }
   
+add_recycled_water_connection_modified <- function(parcel) {
+  print('loading recycled water connection')
+  df <- load_modified_single('Recycled_Water_Connection_Modified', 'Recycled_Water_Connection_Modified_Value', 'Recycled_Water_Connection_Modified_Comment')
+  
+  parcel <- left_join(parcel, df) %>%
+    mutate(Recycled_Water_Connection_Prelim = Recycled_Water_Connection,
+           Recycled_Water_Connection = if_else(!is.na(Recycled_Water_Connection_Modified),
+                                               Recycled_Water_Connection_Modified_Value,
+                                               Recycled_Water_Connection_Prelim),
+           
+           Recycled_Water_Use_Ac_Ft = if_else(Recycled_Water_Connection=='Yes', 
+                                              Recycled_Water_Use_Ac_Ft, 
+                                             0)) 
+  return(parcel)
+}
+
+add_recycled_water_modified <- function(parcel) {
+  print('loading recycled water modified')
+  df <- load_modified_single('Recycled_Water_Use_Modified', 'Recycled_Water_Use_Modified_Ac_Ft', 'Recycled_Water_Use_Comment')
+  
+  df <-   mutate(df, 
+                 Recycled_Water_Connection = ifelse(
+                   !is.na(Recycled_Water_Use_Modified_Ac_Ft) & Recycled_Water_Use_Modified_Ac_Ft > 0,
+                   "Yes", "No"))
+  
+  parcel <- left_join(parcel, df) %>%
+    mutate(Recycled_Water_Use_Modified = ifelse(is.na(Recycled_Water_Use_Modified),'No','Yes'),
+           Recycled_Water_Use_Modified_Ac_Ft_prelim = Recycled_Water_Use_Ac_Ft,
+           Recycled_Water_Use_Modified_Ac_Ft_prelim = if_else(is.na(Recycled_Water_Use_Modified_Ac_Ft_prelim),
+                                                              0,
+                                                              Recycled_Water_Use_Modified_Ac_Ft_prelim), #fix na values
+           Recycled_Water_Use_Ac_Ft = if_else(Recycled_Water_Use_Modified=='Yes', 
+                                              Recycled_Water_Use_Modified_Ac_Ft, 
+                                              Recycled_Water_Use_Modified_Ac_Ft_prelim)) 
+  
+  return(parcel)
+}
