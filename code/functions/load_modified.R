@@ -111,10 +111,16 @@ replace_use_code <- function(parcel) {
 
 add_urban_irrigation_modified <- function(parcel) {
   print('loading urban irrigation modified')
-  df <- load_modified_single('Urban_Irrigation_Modified', 'Urban_Irrigation_GW_Use_Modified_Ac_Ft', 'Urban_Irrigation_Comment')
+  df <- load_modified_single('Urban_Irrigation_Modified', 'Urban_Irrigation_Modified_Ac_Ft', 'Urban_Irrigation_GW_Use_Comment')
 
 
-  parcel <- left_join(parcel, df)
+  parcel <- left_join(parcel, df)  %>%
+    mutate(
+      Urban_Irrigation_GW_Use_Prelim_Ac_Ft = Urban_Irrigation_GW_Use_Ac_Ft,
+      Urban_Irrigation_GW_Use_Ac_Ft   = ifelse(
+        Urban_Irrigation_Modified == "Yes",
+        Urban_Irrigation_Modified_Ac_Ft,
+        Urban_Irrigation_GW_Use_Prelim_Ac_Ft))
 
   return(parcel)
 }

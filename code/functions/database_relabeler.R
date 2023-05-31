@@ -9,11 +9,13 @@ relable_parc <- function(parc){
   #   readxl::read_xlsx(sheet = 'Sheet1') %>%
   #   select(c('Field_Name', 'Field_Name_PRMD'))
   
-  s_ <- path(data_path, "schema", 
-             '2022_07_21 GSA Schema from RP.xlsx')
-  print('Loading pre-processed list of urban wells')
-  schema <- s_ %>%
-    readxl::read_xlsx(sheet = 'Sheet1')
+  # s_ <- path(data_path, "schema", 
+  #            '2022_07_21 GSA Schema from RP.xlsx')
+  # print('Loading pre-processed list of urban wells')
+  # schema <- s_ %>%
+  #   readxl::read_xlsx(sheet = 'Sheet1')
+  
+  schema <-get_schema(data_path)
   
   colnames(schema) <- gsub(" ", "_", colnames(schema))
   
