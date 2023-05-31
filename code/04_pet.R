@@ -162,6 +162,11 @@ ppet <- left_join(ppet, recy, by = "APN") %>%
   mutate(Recycled_Water_Connection = ifelse(
     !is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No")
   )
+
+ppet <- add_recycled_water_modified(ppet)
+
+ppet <- add_recycled_water_connection_modified(ppet)
+
 f_progress()
 f_verify_non_duplicates()
 
@@ -174,6 +179,11 @@ ppet <- left_join(ppet, ewrims_key) %>%
   mutate(Surface_Water_Connection = ifelse(
     !is.na(Surface_Water_Use_Ac_Ft) & Surface_Water_Use_Ac_Ft > 0, 
     "Yes", "No"))
+
+ppet <- add_surface_water_modified(ppet)
+
+ppet <- add_surface_water_connection_modified(ppet)
+
 f_progress()
 f_verify_non_duplicates()
 
@@ -421,6 +431,9 @@ res_use_accessor_key <- readxl::read_xlsx(accessor_key_path,
          Res_W_Use_Assessor_Ac_Ft = residential_use, 
          Commercial_W_Use_Assessor_Ac_Ft = commercial_industrial_misc_use)
 
+#TODO check UseCode Modified option
+ppet <- replace_use_code(ppet)
+
 # add Residential and Commercial Water Use based on Accessor Code
 ppet <- left_join(ppet, res_use_accessor_key) 
 
@@ -526,6 +539,8 @@ ppet <- ppet %>%
     Urban_Irrigation_GW_Use_Prelim_Ac_Ft = ifelse(
       Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
 #Todo Remove '&Public_Water_connection=='Yes' in order remove requirement that parcel has PWC and a well
+
+ppet <- add_urban_irrigation_modified(ppet)
 
 # blank fields to permit revision of the data
 ppet <- ppet %>% 
