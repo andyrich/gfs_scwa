@@ -279,6 +279,9 @@ psrp <- left_join(psrp, ewrims_key) %>%
 
 psrp <- add_surface_water_modified(psrp)
 
+psrp <- add_surface_water_connection_modified(psrp)
+
+
 f_progress()
 f_verify_non_duplicates()
 print('done loading surface water data')

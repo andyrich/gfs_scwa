@@ -125,6 +125,23 @@ add_urban_irrigation_modified <- function(parcel) {
   return(parcel)
 }
 
+add_surface_water_connection_modified <- function(parcel) {
+  print('loading surface water connection')
+  df <- load_modified_single('Surface_Water_Connection_Modified', 'Surface_Water_Connection_Modified_Value', 'Surface_Water_Connection_Modified_Comment')
+  print(df)
+  parcel <- left_join(parcel, df) %>%
+    mutate(Surface_Water_Connection_Prelim = Surface_Water_Connection,
+           Surface_Water_Connection = if_else(!is.na(Surface_Water_Connection_Modified),
+                                             Surface_Water_Connection_Modified_Value,
+                                             Surface_Water_Connection_Prelim),
+           
+           Surface_Water_Use_Ac_Ft = if_else(Surface_Water_Connection=='Yes', 
+                                             Surface_Water_Use_Ac_Ft, 
+                                             0)) 
+  
+  return(parcel)
+}
+
 add_surface_water_modified <- function(parcel) {
   print('loading surface water modified')
   df <- load_modified_single('Surface_Water_Use_Modified', 'Surface_Water_Use_Modified_Ac_Ft', 'Surface_Water_Comment')
@@ -136,7 +153,8 @@ add_surface_water_modified <- function(parcel) {
   
   parcel <- left_join(parcel, df) %>%
     mutate(Surface_Water_Use_Modified = ifelse(is.na(Surface_Water_Use_Modified),'No','Yes'),
-           Surface_Water_Use_Ac_Ft_prelim = Surface_Water_Use_Ac_Ft, 
+           Surface_Water_Use_Ac_Ft_prelim = Surface_Water_Use_Ac_Ft,
+           Surface_Water_Use_Ac_Ft_prelim = if_else(is.na(Surface_Water_Use_Ac_Ft_prelim),0,Surface_Water_Use_Ac_Ft_prelim), #fix na values
            Surface_Water_Use_Ac_Ft = if_else(Surface_Water_Use_Modified=='Yes', 
                                              Surface_Water_Use_Modified_Ac_Ft, 
                                              Surface_Water_Use_Ac_Ft_prelim)) 

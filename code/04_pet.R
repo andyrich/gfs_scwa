@@ -177,6 +177,8 @@ ppet <- left_join(ppet, ewrims_key) %>%
 
 ppet <- add_surface_water_modified(ppet)
 
+ppet <- add_surface_water_connection_modified(ppet)
+
 f_progress()
 f_verify_non_duplicates()
 

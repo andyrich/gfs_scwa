@@ -176,6 +176,8 @@ pson <- left_join(pson, ewrims_key) %>%
 
 pson <- add_surface_water_modified(pson)
 
+pson <- add_surface_water_connection_modified(pson)
+
 f_progress()
 f_verify_non_duplicates()
 
