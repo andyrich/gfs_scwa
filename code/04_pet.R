@@ -35,11 +35,12 @@ psrp <- read_rds(path(data_path, "data_output/srp_parcel.rds"))
 cat("Loaded preprocedded spatial parcels from Sonoma County.\n")
 
 # final fields to use
-fields <- path(data_path, "schema/2022_07_21 GSA Schema from RP.xlsx") %>% 
-  readxl::read_xlsx(sheet = 1, range = cellranger::cell_cols("B")) %>% 
-  set_names("name") %>% 
-  filter(!is.na(name)) %>% 
-  pull(name)
+# fields <- path(data_path, "schema/2022_07_21 GSA Schema from RP.xlsx") %>% 
+#   readxl::read_xlsx(sheet = 1, range = cellranger::cell_cols("B")) %>% 
+#   set_names("name") %>% 
+#   filter(!is.na(name)) %>% 
+#   pull(name)
+fields <- get_schema_fields(data_path)
 fields <- c(fields, "UseCode", 'edge') # add use code and drop it later
 
 # GSA spatial data
@@ -232,8 +233,8 @@ ppet <- ppet %>%
     # no well count means 0 onsite wells
     Well_Count = ifelse(is.na(Well_Count), 0, Well_Count),
     Active_Well = ifelse(Well_Count > 0, "Yes", "No"),
-    Shared_Well = NA, # placeholder for future review
-    Shared_Well_APN = NA, # placeholder for future review
+    # Shared_Well = NA, # placeholder for future review
+    # Shared_Well_APN = NA, # placeholder for future review
     Well_Records_Available = ifelse(Well_Count > 0, "Yes", "No"),
     Onsite_Well = ifelse(
       Active_Well == "Yes" | Well_Records_Available == "Yes", 
@@ -242,6 +243,11 @@ ppet <- ppet %>%
     # Urban_Well = ifelse(Well_Count>0,'Yes','No')
   ) 
 
+ppet <- ppet %>% replace_Onsite_Well_modified() %>%
+  replace_Well_Records_Available_modified() %>%
+  replace_shared_well_APN_modified() %>%
+  replace_shared_well_modified() %>%
+  replace_active_well_modified()
 
 ## special deactivated wells 
 #deactivated_wells <- path(data_path, "pet/public_water_connection",
@@ -532,23 +538,16 @@ f_verify_non_duplicates()
 # Cities will be used in the future to set to "Yes"'
 
 ppet <- load_urban_wells(data_path, ppet)
+ppet <- replace_urban_well_modified(ppet)
 
 # if there’s an urban well & public water connection, assume 0.1 AF/yr, else 0
 ppet <- ppet %>% 
   mutate(
-    Urban_Irrigation_GW_Use_Prelim_Ac_Ft = ifelse(
+    Urban_Irrigation_GW_Use_Ac_Ft = ifelse(
       Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
 #Todo Remove '&Public_Water_connection=='Yes' in order remove requirement that parcel has PWC and a well
 
 ppet <- add_urban_irrigation_modified(ppet)
-
-# blank fields to permit revision of the data
-ppet <- ppet %>% 
-  mutate(
-         Urban_Irrigation_GW_Use_Ac_Ft   = ifelse(
-           Urban_Irrigation_Modified == "Yes", 
-           Urban_Irrigation_GW_Use_Modified_Ac_Ft, 
-           Urban_Irrigation_GW_Use_Prelim_Ac_Ft))
 
 f_progress()
 f_verify_non_duplicates()

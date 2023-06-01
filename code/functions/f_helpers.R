@@ -12,3 +12,29 @@ f_verify_non_duplicates <- function(){
   print(nrow(distinct(aoi_obj)))
   print(length(unique(aoi_obj$APN)))
 }
+
+get_schema_fields <- function(data_path){
+  fields <- get_schema_path(data_path) %>%
+  readxl::read_xlsx(sheet = 1, range = cellranger::cell_cols("B")) %>%
+  set_names("name") %>%
+  filter(!is.na(name)) %>%
+  pull(name)
+
+  return(fields)
+}
+
+get_schema <- function(data_path){
+s_ <-get_schema_path(data_path)
+print("loading schema")
+print(s_)
+schema <- s_ %>%
+  readxl::read_xlsx(sheet = 'Sheet1')
+
+return(schema)
+}
+
+get_schema_path <-function(data_path){
+  s_ <- path(data_path, "schema",
+             '2023_05_31 GSA Schema from RP.xlsx')
+  return(s_)
+}
