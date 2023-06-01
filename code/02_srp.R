@@ -348,6 +348,12 @@ print('done loading surface water data')
 # f_progress()
 # f_verify_non_duplicates()
 
+psrp <- psrp %>% replace_Onsite_Well_modified() %>%
+  replace_Well_Records_Available_modified() %>%
+  replace_shared_well_APN_modified() %>%
+  replace_shared_well_modified() %>%
+  replace_active_well_modified()
+
 
 ## water service areas ----------------------------------------------------
 
@@ -645,6 +651,7 @@ psrp <- psrp %>%
 # Cities will be used in the future to set to "Yes"'
 
 psrp <- load_urban_wells(data_path, psrp)
+psrp <- replace_urban_well_modified(psrp)
 
 # if there’s an urban well & public water connection, assume 0.1 AF/yr, else 0
 psrp <- psrp %>%

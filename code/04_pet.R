@@ -233,8 +233,8 @@ ppet <- ppet %>%
     # no well count means 0 onsite wells
     Well_Count = ifelse(is.na(Well_Count), 0, Well_Count),
     Active_Well = ifelse(Well_Count > 0, "Yes", "No"),
-    Shared_Well = NA, # placeholder for future review
-    Shared_Well_APN = NA, # placeholder for future review
+    # Shared_Well = NA, # placeholder for future review
+    # Shared_Well_APN = NA, # placeholder for future review
     Well_Records_Available = ifelse(Well_Count > 0, "Yes", "No"),
     Onsite_Well = ifelse(
       Active_Well == "Yes" | Well_Records_Available == "Yes", 
@@ -243,6 +243,11 @@ ppet <- ppet %>%
     # Urban_Well = ifelse(Well_Count>0,'Yes','No')
   ) 
 
+ppet <- ppet %>% replace_Onsite_Well_modified() %>%
+  replace_Well_Records_Available_modified() %>%
+  replace_shared_well_APN_modified() %>%
+  replace_shared_well_modified() %>%
+  replace_active_well_modified()
 
 ## special deactivated wells 
 #deactivated_wells <- path(data_path, "pet/public_water_connection",
@@ -533,6 +538,7 @@ f_verify_non_duplicates()
 # Cities will be used in the future to set to "Yes"'
 
 ppet <- load_urban_wells(data_path, ppet)
+ppet <- replace_urban_well_modified(ppet)
 
 # if there’s an urban well & public water connection, assume 0.1 AF/yr, else 0
 ppet <- ppet %>% 

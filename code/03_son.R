@@ -229,13 +229,23 @@ pson <- pson %>%
     # no well count means 0 onsite wells
     Well_Count = ifelse(is.na(Well_Count), 0, Well_Count),
     Active_Well = ifelse(Well_Count > 0, "Yes", "No"),
-    Shared_Well = NA, # placeholder for future review
-    Shared_Well_APN = NA, # placeholder for future review
+    # Shared_Well = "No", # placeholder for future review
+    # Shared_Well_APN = '', # placeholder for future review
     Well_Records_Available = ifelse(Well_Count > 0, "Yes", "No"),
     Onsite_Well = 
       ifelse(Active_Well == "Yes" | Well_Records_Available == "Yes", 
              "Yes", "No")
   ) 
+
+
+
+pson <- pson %>% replace_Onsite_Well_modified() %>%
+  replace_Well_Records_Available_modified() %>%
+  replace_shared_well_APN_modified() %>%
+  replace_shared_well_modified() %>%
+  replace_active_well_modified()
+  
+
 f_progress()
 f_verify_non_duplicates()
 
@@ -565,6 +575,7 @@ f_verify_non_duplicates()
 # Cities will be used in the future to set to "Yes"'
 
 pson <- load_urban_wells(data_path, pson)
+pson <- replace_urban_well_modified(pson)
 
 # if there’s an urban well & public water connection, assume 0.1 AF/yr, else 0
 pson <- pson %>% 

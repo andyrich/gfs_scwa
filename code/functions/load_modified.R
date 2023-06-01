@@ -82,11 +82,6 @@ join_with_modified <- function(parcel){
            Commercial_GW_Use_Modified = ifelse(is.na(Commercial_GW_Use_Modified),'No','Yes'),
            Res_GW_Use_Modified = ifelse(is.na(Res_GW_Use_Modified),'No','Yes'),
            School_Golf_Modified = ifelse(is.na(School_Golf_Modified),'No','Yes'),
-           
-           # Urban_Irrigation_Modified = ifelse(is.na(Urban_Irrigation_Modified),'No','Yes'), #TODO check Urban_Irrigation_Modified
-           # Surface_Water_Connection_Modified = ifelse(is.na(Surface_Water_Connection_Modified),'No','Yes'), #TODO check Surface_Water_Connection_Modified
-           # Surface_Water_Use_Modified = ifelse(is.na(Surface_Water_Use_Modified),'No','Yes'), #TODO check Surface_Water_Use_Modified
-           # Recycled_Water_Use_Modified = ifelse(is.na(Recycled_Water_Use_Modified),'No','Yes'), #TODO check Recycled_Water_Use_Modified
            )
   
   return(parcel)
@@ -196,6 +191,105 @@ add_recycled_water_modified <- function(parcel) {
            Recycled_Water_Use_Ac_Ft = if_else(Recycled_Water_Use_Modified=='Yes', 
                                               Recycled_Water_Use_Modified_Ac_Ft, 
                                               Recycled_Water_Use_Modified_Ac_Ft_prelim)) 
+  
+  return(parcel)
+}
+
+replace_active_well_modified <- function(parcel) {
+  
+  df <- load_modified_single('Active_Well_Modified', 'Active_Well_Modified_Value', 'Comment')
+  
+  df$Comment <- NULL
+  
+  parcel <- left_join(parcel, df) %>%
+    mutate(Active_Well_Modified = ifelse(is.na(Active_Well_Modified),'No','Yes'),
+           Active_Well = if_else(Active_Well_Modified=='Yes', Active_Well_Modified_Value, Active_Well)) 
+  
+  return(parcel)
+}
+
+replace_shared_well_modified <- function(parcel) {
+  
+  df <- load_modified_single('Shared_Well_Modified', 'Shared_Well_Modified_Value', 'Comment')
+  
+  df$Comment <- NULL
+  
+  if ('Shared_Well' %in% colnames(parcel)){
+    print('--------------changing shared well-=-------------bbbbbbbbbbbbbbbbbb') # should only be done for SRP
+    parcel <-mutate(parcel, 
+                    Shared_Well = replace_na(Shared_Well, 'No'))}
+  else {    parcel <-mutate(parcel, 
+                            Shared_Well = 'No')
+  }
+  
+
+  
+  parcel <- left_join(parcel, df) %>%
+    mutate(Shared_Well_Modified = ifelse(is.na(Shared_Well_Modified),'No','Yes'),
+           Shared_Well = if_else(Shared_Well_Modified=='Yes', Shared_Well_Modified_Value, Shared_Well)) 
+  
+  
+  return(parcel)
+}
+
+replace_shared_well_APN_modified <- function(parcel) {
+  
+  df <- load_modified_single('Shared_Well_APN_Modified', 'Shared_Well_APN_Modified_Value', 'Comment')
+  
+  df$Comment <- NULL
+  
+  if ('Shared_Well_APN' %in% colnames(parcel)){
+    print('changing Shared_Well_APN') # should only be done for SRP
+    parcel <-mutate(parcel, 
+                    Shared_Well_APN = replace_na(Shared_Well_APN, '')) }
+  else {    parcel <-mutate(parcel, 
+                            Shared_Well_APN = '')
+  }
+
+  
+  parcel <- left_join(parcel, df) %>%
+    mutate(Shared_Well_APN_Modified = ifelse(is.na(Shared_Well_APN_Modified),'No','Yes'),
+           Shared_Well_APN = if_else(Shared_Well_APN_Modified=='Yes', Shared_Well_APN_Modified_Value, Shared_Well_APN)
+           ) 
+  
+  return(parcel)
+}
+
+replace_Well_Records_Available_modified <- function(parcel) {
+  
+  df <- load_modified_single('Well_Records_Available_Modified', 'Well_Records_Available_Modified_Value', 'Comment')
+  
+  df$Comment <- NULL
+  
+  parcel <- left_join(parcel, df) %>%
+    mutate(Well_Records_Available_Modified = ifelse(is.na(Well_Records_Available_Modified),'No','Yes'),
+           Well_Records_Available = if_else(Well_Records_Available_Modified=='Yes', Well_Records_Available_Modified_Value, Well_Records_Available)) 
+  
+  return(parcel)
+}
+
+replace_Onsite_Well_modified <- function(parcel) {
+  
+  df <- load_modified_single('Onsite_Well_Modified', 'Onsite_Well_Modified_Value', 'Comment')
+  
+  df$Comment <- NULL
+  
+  parcel <- left_join(parcel, df) %>%
+    mutate(Onsite_Well_Modified = ifelse(is.na(Onsite_Well_Modified),'No','Yes'),
+           Onsite_Well = if_else(Onsite_Well_Modified=='Yes', Onsite_Well_Modified_Value, Onsite_Well)) 
+  
+  return(parcel)
+}
+
+replace_urban_well_modified <- function(parcel) {
+  
+  df <- load_modified_single('Urban_Well_Modified', 'Urban_Well_Modified_Value', 'Comment')
+  
+  df$Comment <- NULL
+  
+  parcel <- left_join(parcel, df) %>%
+    mutate(Urban_Well_Modified = ifelse(is.na(Urban_Well_Modified),'No','Yes'),
+           Urban_Well = if_else(Urban_Well_Modified=='Yes', Urban_Well_Modified_Value, Urban_Well)) 
   
   return(parcel)
 }
