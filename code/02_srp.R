@@ -31,7 +31,7 @@ unsub_gw_sub_rate = 40. #unsubsidized rate
 # preprocessed spatial parcels from Sonoma Co parcels
 pson <- read_rds(path(data_path, "data_output/son_parcel.rds"))
 ppet <- read_rds(path(data_path, "data_output/pet_parcel.rds"))
-psrp <- read_rds(path(data_path, "data_output/srp_parcel_shelly.rds"))
+psrp <- read_rds(path(data_path, "data_output/srp_parcel.rds"))
 cat("Loaded preprocedded spatial parcels from Sonoma County.\n")
 
 # final fields to use
@@ -57,12 +57,37 @@ cat("Loaded B118 spatial boundaries per region.\n")
 
 done <- fields[fields %in% colnames(psrp)]  # cols already there
 add  <- fields[!fields %in% colnames(psrp)] # cols to add
-add  <- add[-which(add == "UseCode")] # remove unneeded col
 rem  <- colnames(psrp)[!colnames(psrp) %in% fields] # cols to remove
 rem  <- rem[-length(rem)] # don't remove the geometry column
 
 
+# # temp need to fix
+# psrp$Public_Water_Connection <- 'No'
+
 # remove fields -----------------------------------------------------------
+
+
+# parcel and contact info -------------------------------------------------
+
+psrp <- psrp %>% 
+  mutate(
+    # parcel and contact info
+    LandSizeAcres       = LndSzAcre, # this value gets changed below
+    LandSizeParcelAcres = LandSizeAcres,
+    UseCode_Description = UseCDesc,
+    UseCode_Category    = UseCType,
+    CurrentOwnerName    = NA,
+    MailingAddress1     = MailAdr1,
+    MailingAddress2     = MailAdr2,
+    MailingAddress3     = MailAdr3,
+    MailingAddress4     = MailAdr4,
+    Situs_Address       = SitusFmt1)
+
+f_progress()
+
+psrp <- psrp %>%
+  mutate(Jurisdiction = ifelse(CityType == 'Incorporated',
+                               POCity, 'Unincorporated Sonoma County'))
 
 # remove fields that should not be in the final database
 psrp <- psrp %>% select(-all_of(rem))
@@ -70,52 +95,89 @@ cat("Removed", length(rem), "fields from parcel database.\n   ",
     paste(rem, collapse = "\n    "))
 
 
+print(colnames(psrp))
+# colstodrop = c(
+#   'Ag_GW_Use_Modified',
+#   'Ag_GW_Use_Modified_Ac_Ft',
+#   'Ag_GW_Use_Comment',
+#   "Res_GW_Use_Modified",
+#   "Res_GW_Use_Modified_Ac_Ft",
+#   "Res_GW_Use_Comment",
+#   "Commercial_GW_Use_Modified",
+#   "Commercial_GW_Use_Modified_Ac_Ft",
+#   "Commercial_GW_Use_Comment",
+#   "Urban_Irrigation_Modified",
+#   "Urban_Irrigation_Modified_Ac_Ft",
+#   "Urban_Irrigation_GW_Use_Comment",
+#   "School_Golf_Modified",
+#   # "School_Golf_Modified_Ac_Ft",
+#   "School_Golf_GW_Use_Comment",
+#   "CA_DrinkingWater_SvcArea_Name",
+#   "CA_DrinkingWater_SvcArea_Within")
 
-colstodrop = c(
-  'Ag_GW_Use_Modified',
-  'Ag_GW_Use_Modified_Ac_Ft',
-  'Ag_GW_Use_Comment',
-  "Res_GW_Use_Modified",
-  "Res_GW_Use_Modified_Ac_Ft",
-  "Res_GW_Use_Comment",
-  "Commercial_GW_Use_Modified",
-  "Commercial_GW_Use_Modified_Ac_Ft",
-  "Commercial_GW_Use_Comment",
-  "Urban_Irrigation_Modified",
-  "Urban_Irrigation_Modified_Ac_Ft",
-  "Urban_Irrigation_GW_Use_Comment",
-  "School_Golf_Modified",
-  # "School_Golf_Modified_Ac_Ft",
-  "School_Golf_GW_Use_Comment")
+# # if you want to see if these fields should be dropped, uncomment here:
+# # for (val in cols){
+# #   print(val)
+# #   print(unique(st_drop_geometry(psrp[,val])))
+# # }
+# # all fields are either null or "No' for Modified
+# 
+# #drop the following columns
+# print('removing cols')
+# psrp <- select(psrp, -colstodrop)
+# print('done')
 
-# if you want to see if these fields should be dropped, uncomment here:
-# for (val in cols){
-#   print(val)
-#   print(unique(st_drop_geometry(psrp[,val])))
-# }
-# all fields are either null or "No' for Modified
 
-#drop the following columns
-print('removing cols')
-psrp <- select(psrp, -colstodrop)
-print('done')
+# ## water service areas ----------------------------------------------------
+# 
+# # water service areas in SON
+# wsa <- path(data_path, "general", "water_system_boundaries",
+#             "SABL_Public_083121/SABL_Public_083121.shp") %>% 
+#   st_read() %>% 
+#   st_transform(epsg)  %>%
+#   st_intersection(srp) %>% 
+#   select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1,
+#          pwsid = SABL_PWSID) 
+# 
+# 
+# # add water service areas to parcel data, first need to summarize data
+# # to avoid duplicates where a parcel falls within more than one water system!
+# wsa_key <- st_join(psrp, wsa) %>% 
+#   select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
+#   group_by(APN) %>% 
+#   # for parcels with > 1 water system, combine water system names
+#   mutate(CA_DrinkingWater_SvcArea_Name = paste(
+#     CA_DrinkingWater_SvcArea_Name, collapse = "; ")) %>%
+#   ungroup() %>% 
+#   distinct() %>% 
+#   st_drop_geometry() %>% 
+#   select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
+#   # coerce character "NA" to NA
+#   mutate(CA_DrinkingWater_SvcArea_Name = ifelse(
+#     CA_DrinkingWater_SvcArea_Name == "NA", 
+#     NA, CA_DrinkingWater_SvcArea_Name)) 
+# 
+# psrp <- left_join(psrp, wsa_key) %>% 
+#   mutate(CA_DrinkingWater_SvcArea_Within = 
+#            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
-# ad hoc cleaning post-shelly's work --------------------------------------
 
-psrp <- psrp %>% 
-  mutate(
-    # fix NA water systems to match SON and PET
-    CA_DrinkingWater_SvcArea_Name = ifelse(
-      CA_DrinkingWater_SvcArea_Name == "Not In Public Water System",
-      NA,
-      CA_DrinkingWater_SvcArea_Name)
-  ) %>% 
-  separate(UseCode_Description, 
-           into = c("UseCode", "UseCode_Description"), 
-           sep = " ", 
-           extra = "merge") %>% 
-  # remove brackets
-  mutate(UseCode_Description = str_remove_all(UseCode_Description, "\\[|\\]"))
+# # ad hoc cleaning post-shelly's work --------------------------------------
+# 
+# psrp <- psrp %>% 
+#   mutate(
+#     # fix NA water systems to match SON and PET
+#     CA_DrinkingWater_SvcArea_Name = ifelse(
+#       CA_DrinkingWater_SvcArea_Name == "Not In Public Water System",
+#       NA,
+#       CA_DrinkingWater_SvcArea_Name)
+#   ) %>% 
+#   separate(UseCode_Description, 
+#            into = c("UseCode", "UseCode_Description"), 
+#            sep = " ", 
+#            extra = "merge") %>% 
+#   # remove brackets
+#   mutate(UseCode_Description = str_remove_all(UseCode_Description, "\\[|\\]"))
 
 
 
@@ -127,6 +189,8 @@ psrp <- psrp %>%
 
 # # parcels that intersect multiple basins have duplicate APN across databases
 # boundary_parcels <- psrp$APN[psrp$APN %in% ppet$APN]
+
+print(colnames(psrp))
 
 psrp <- psrp %>% 
   mutate(
@@ -279,8 +343,8 @@ ewrims_key <- f_load_surface_water(data_path)
 #   ungroup()
 
 
-#remove columns Surface_Water_Connection and Surface_Water_Use_Ac_Ft
-psrp <- subset(psrp, select = -c(Surface_Water_Use_Ac_Ft, Surface_Water_Connection))
+# #remove columns Surface_Water_Connection and Surface_Water_Use_Ac_Ft
+# psrp <- subset(psrp, select = -c(Surface_Water_Use_Ac_Ft, Surface_Water_Connection))
 
 psrp <- left_join(psrp, ewrims_key) %>%
   mutate(Surface_Water_Connection = ifelse(
@@ -299,18 +363,18 @@ print('done loading surface water data')
 
 ## wells ------------------------------------------------------------------
 # Sonoma county wells - deduplicate
-# scwells <- path(data_path, "general", 
-#                 "soco_wells/all_soco_wells_spatial.shp") %>% 
-#   st_read() %>% 
-#   st_transform(epsg) %>% 
-#   st_intersection(select(psrp, APN)) %>%
-#   add_count(APN, name = "Well_Count") %>% 
-#   group_by(APN) %>% 
-#   mutate(Well_Log_Nos = paste(Log_No, collapse = "; ")) %>% 
-#   slice(1) %>% 
-#   ungroup() %>% 
-#   select(APN, Well_Count, Well_Log_Nos) %>% 
-#   st_drop_geometry()
+scwells <- path(data_path, "general",
+                "soco_wells/all_soco_wells_spatial.shp") %>%
+  st_read() %>%
+  st_transform(epsg) %>%
+  st_intersection(select(psrp, APN)) %>%
+  add_count(APN, name = "Well_Count") %>%
+  group_by(APN) %>%
+  mutate(Well_Log_Nos = paste(Log_No, collapse = "; ")) %>%
+  slice(1) %>%
+  ungroup() %>%
+  select(APN, Well_Count, Well_Log_Nos) %>%
+  st_drop_geometry()
 
 # DEPRICATED: just know that more detailed well data is here
 # Sonoma count well data - deduplicate
@@ -331,20 +395,23 @@ print('done loading surface water data')
 #   pull(APN) %>% 
 #   unique()
 
+
+
 # populate database columns
-# psrp <- psrp %>% 
-#   left_join(scwells) %>% 
-#   mutate(
-#     # no well count means 0 onsite wells
-#     Well_Count = ifelse(is.na(Well_Count), 0, Well_Count),
-#     Active_Well = ifelse(Well_Count > 0, "Yes", "No"),
-#     Shared_Well = NA, # placeholder for future review
-#     Shared_Well_APN = NA, # placeholder for future review
-#     Well_Records_Available = ifelse(Well_Count > 0, "Yes", "No"),
-#     Onsite_Well = 
-#       ifelse(Active_Well == "Yes" | Well_Records_Available == "Yes", 
-#              "Yes", "No")
-#   ) 
+psrp <- psrp %>%
+  left_join(scwells) %>%
+  mutate(
+    # no well count means 0 onsite wells
+    Well_Count = ifelse(is.na(Well_Count), 0, Well_Count),
+    # Well_Count = 0, # wellcount=0 for all SRP wells as of 6/6/2023, so leaving here as default
+    Active_Well = ifelse(Well_Count > 0, "Yes", "No"),
+    # Shared_Well = NA, # placeholder for future review
+    # Shared_Well_APN = NA, # placeholder for future review
+    Well_Records_Available = ifelse(Well_Count > 0, "Yes", "No"),
+    Onsite_Well =
+      ifelse(Active_Well == "Yes" | Well_Records_Available == "Yes",
+             "Yes", "No")
+  )
 # f_progress()
 # f_verify_non_duplicates()
 
@@ -367,18 +434,22 @@ wsa <- path(data_path, "general", "water_system_boundaries",
   select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1,
          pwsid = SABL_PWSID)
 
+
+
+
 # sanity check
 # mapview(pet) + mapview(wsa)
 
-# rm Shelly's work
-psrp$CA_DrinkingWater_SvcArea_Name <- NULL
-psrp$CA_DrinkingWater_SvcArea_Within <- NULL
-psrp$Urban_Well <- NULL
-psrp$Urban_Irrigation_GW_Use_Prelim_Ac_Ft <- NULL
+# # rm Shelly's work
+# psrp$CA_DrinkingWater_SvcArea_Name <- NULL
+# psrp$CA_DrinkingWater_SvcArea_Within <- NULL
+# psrp$Urban_Well <- NULL
+# psrp$Urban_Irrigation_GW_Use_Prelim_Ac_Ft <- NULL
 
 
 # list of water service areas to remove
 # these providers depend on explicit connection data for their Public_Water_Connection
+# these values added via modified values on 6/12/2023
 wsa_remove = c('SEBASTOPOL, CITY OF',
                'WINDSOR, TOWN OF',
                'PENNGROVE WATER COMPANY (PUC)')
@@ -429,22 +500,28 @@ f_verify_non_duplicates()
 # add explicit connection data from Petaluma, Sebastapol, Sonoma, Penngrove,
 # and Valley of the Moonb WD - from Shelly on 2022-01-04, Email Subject:
 # Data Revision/Addition | Permit Sonoma GIS: GSA Water Service Connection | ID APN-to-Address
-windsor_path <- path(data_path, "srp", "public_water_connection",
-                     "Windsor Water Service.gdb")
-cat("Reading in explicit connection data for:\n",
-    paste(rgdal::ogrListLayers(windsor_path), collapse = "\n "))
 
-explicit_connections <- rgdal::ogrListLayers(windsor_path)[2] %>%
-  purrr::map_df(
-    ~rgdal::readOGR(dsn = windsor_path, layer = .x) %>%
-      st_as_sf() %>%
-      select(APN))
 
-# if an explicit connection is present, ensure it is represented
-psrp <- psrp %>%
-  mutate(Public_Water_Connection = ifelse(
-    APN %in% explicit_connections$APN | Public_Water_Connection == "Yes",
-    "Yes", "No"))
+# windosr connections have been added to the modified_apns list. 6/12/2023
+# windsor_path <- path(data_path, "srp", "public_water_connection",
+#                      "Windsor Water Service.gdb")
+# cat("Reading in explicit connection data for:\n",
+#     paste(rgdal::ogrListLayers(windsor_path), collapse = "\n "))
+# 
+# explicit_connections <- rgdal::ogrListLayers(windsor_path)[2] %>%
+#   purrr::map_df(
+#     ~rgdal::readOGR(dsn = windsor_path, layer = .x) %>%
+#       st_as_sf() %>%
+#       select(APN))
+
+
+
+
+# # if an explicit connection is present, ensure it is represented
+# psrp <- psrp %>%
+#   mutate(Public_Water_Connection = ifelse(
+#     APN %in% explicit_connections$APN | Public_Water_Connection == "Yes",
+#     "Yes", "No"))
 
 # add public water connections for modified APNs:
 apn_add_pwc <- path(data_path, "general/modified_apns.xlsx") %>% 
@@ -459,7 +536,7 @@ apn_no <- apn_add_pwc[ tolower(apn_add_pwc$Public_Water_Connection_Modified)
 psrp <- psrp %>% 
   mutate(Public_Water_Connection = ifelse(
     APN %in% apn_yes,
-    "Yes", Public_Water_Connection)
+    "Yes", "No")
   )
 psrp <- psrp %>% 
   mutate(Public_Water_Connection = ifelse(
@@ -468,25 +545,52 @@ psrp <- psrp %>%
   )
 
 
-# # ensure public water connection is listed for specified Accessor Use Codes
-# accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
-#                           "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
-# pwc_accessor_key <- readxl::read_xlsx(accessor_key_path, 
-#                                       sheet = 3, range = "B2:C27") %>% 
-#   janitor::clean_names() %>% 
-#   mutate(use_code = str_pad(use_code, 4, "left", "0"))
-# 
-# # if the parcel is within a water service area and the use code is listed, 
-# # mark a public water service connection even if not explicitly listed
-# psrp <- psrp %>% 
-#   mutate(Public_Water_Connection = ifelse(
-#     CA_DrinkingWater_SvcArea_Within == "Yes" & UseCode %in% pwc_accessor_key$use_code,
-#     "Yes", Public_Water_Connection
-#   )
-#   )
-# 
-# f_progress()
-# f_verify_non_duplicates()
+
+# ensure public water connection is listed for specified Accessor Use Codes
+#accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
+#                          "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
+accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
+                          "Final 2022 Water  Use from Assessor Land Use Code.xlsx")
+pwc_accessor_key <- readxl::read_xlsx(accessor_key_path, 
+                                      sheet = 3, range = "B2:C28") %>% 
+  janitor::clean_names() %>% 
+  mutate(use_code = str_pad(use_code, 4, "left", "0"))
+
+# if the parcel is within a water service area and the use code is listed, 
+# mark a public water service connection even if not explicitly listed
+psrp <- psrp %>% 
+  mutate(Public_Water_Connection = ifelse(
+    CA_DrinkingWater_SvcArea_Within == "Yes" & 
+      UseCode %in% pwc_accessor_key$use_code,
+    "Yes", Public_Water_Connection
+  )
+  )
+
+# add public water connections for modified APNs: 
+# TODO: verify this should  be here. it is already incorporated above. Maybe being re-done
+# so that pwc_assessor work is overwrittine
+
+apn_add_pwc <- path(data_path, "general/modified_apns.xlsx") %>%
+  readxl::read_xlsx(sheet = 1) %>%
+  pull(APN)
+
+psrp <- psrp %>%
+  mutate(Public_Water_Connection = ifelse(
+    APN %in% apn_add_pwc,
+    "Yes", Public_Water_Connection),
+    Public_Water_Connection_Modified = ifelse(APN %in% apn_add_pwc,
+                                    "Yes", "No"))
+
+
+water_comment <- path(data_path, "general/modified_apns.xlsx") %>%
+  readxl::read_xlsx(sheet = 1) %>%
+  select(APN, Water_Source_Comment)
+
+psrp <-left_join(psrp,water_comment) %>%
+  mutate(Water_Source_Comment = replace_na(Water_Source_Comment, ''))
+
+f_progress()
+f_verify_non_duplicates()
 
 
 # urban wells -------------------------------------------------------------
@@ -586,10 +690,10 @@ res_use_accessor_key <- readxl::read_xlsx(accessor_key_path,
          Res_W_Use_Assessor_Ac_Ft = residential_use,
          Commercial_W_Use_Assessor_Ac_Ft = commercial_industrial_misc_use)
 
-# add Residential and Commercial Water Use based on Accessor Code
-psrp <- psrp %>% 
-  select(-all_of(c("Res_W_Use_Assessor_Ac_Ft",
-                   "Commercial_W_Use_Assessor_Ac_Ft")))
+# # add Residential and Commercial Water Use based on Accessor Code
+# psrp <- psrp %>% 
+#   select(-all_of(c("Res_W_Use_Assessor_Ac_Ft",
+#                    "Commercial_W_Use_Assessor_Ac_Ft")))
 
 #TODO check UseCode Modified option
 psrp <- replace_use_code(psrp)
@@ -750,7 +854,6 @@ psrp <- psrp %>%
 
 
 ####
-print('adding school stuff')
 # Code to use to incorporate surface water/recycled water uses.
 # calculate groundwater School_Golf_GW_Use_Prelim_Ac_Ft water use
 psrp <- psrp %>%
@@ -1036,7 +1139,7 @@ f_verify_non_duplicates()
 
 # write complete parcel data ----------------------------------------------
 
-psrp %>% 
+psrp %>%
   write_rds(path(data_path, "data_output/srp_parcel_complete.rds"))
 cat("Complete SRP.\n")
 
