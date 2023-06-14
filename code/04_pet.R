@@ -149,10 +149,10 @@ f_progress()
 ## recycled water ---------------------------------------------------------
 # load delivery data from recycled water treatment plants
 
-# recycled water delivered to parcels in 2016 (from billy.dixon@scwa.ca.gov)
+# recycled water delivered to parcels in 2018-2022 (from billy.dixon@scwa.ca.gov)
 recy <- path(
   data_path, 
-  "pet/recycled_water/City of Petaluma 2016-2021 Recycled Water Summary.xlsx") %>% 
+  "pet/recycled_water/output/City of Petaluma 2018-2022 Recycled Water Summary.xlsx") %>% 
   readxl::read_xlsx(sheet = 1) %>%
   select(APN, Mean) %>% 
   mutate(Recycled_Water_Use_Ac_Ft = Mean) %>% 
