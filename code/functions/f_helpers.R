@@ -3,6 +3,17 @@ f_progress <- function(){
   aoi_obj = get(aoi)
   percent = round(sum(colnames(aoi_obj) %in% add)/length(add)*100)
   cat(percent, "% complete.\n")
+  missing_fields<- fields[!(fields  %in% colnames(aoi_obj))]
+  
+  if (percent<100 & length(missing_fields)<10) {
+    print(cat('These are the missing columnames:\n',
+              missing_fields, '\n'))
+  
+  }
+  else {
+    print(cat('These are ', length(missing_fields), ' missing columnames (not listing all)\n'))
+  }
+
 }
 
 # function to ensure no duplicates are returned during spatial joins and joins
