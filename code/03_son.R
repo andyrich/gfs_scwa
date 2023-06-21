@@ -25,6 +25,9 @@ if(file_exists(gjson_out)) file_delete(gjson_out)
 gw_use_rate = 40.00 #$ per AF
 unsub_gw_sub_rate = 73.2 #unsubsidized rate
 
+accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
+                          "Final 2022 Water Use from Assessor Land Use Code.xlsx")
+
 # load data ---------------------------------------------------------------
 
 # preprocessed spatial parcels from Sonoma Co parcels
@@ -253,33 +256,35 @@ f_verify_non_duplicates()
 ## water service areas ----------------------------------------------------
 
 # water service areas in SON
-wsa <- path(data_path, "general", "water_system_boundaries",
-            "SABL_Public_083121/SABL_Public_083121.shp") %>% 
-  st_read() %>% 
-  st_transform(epsg)  %>%
-  st_intersection(son) %>% 
-  select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1,
-         pwsid = SABL_PWSID) 
+# wsa <- path(data_path, "general", "water_system_boundaries",
+#             "SABL_Public_083121/SABL_Public_083121.shp") %>% 
+#   st_read() %>% 
+#   st_transform(epsg)  %>%
+#   st_intersection(son) %>% 
+#   select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1,
+#          pwsid = SABL_PWSID) 
+# 
+# # sanity check
+# # mapview(pet) + mapview(wsa)
+# 
+# # add water service areas to parcel data, first need to summarize data
+# # to avoid duplicates where a parcel falls within more than one water system!
+# wsa_key <- st_join(pson, wsa) %>% 
+#   select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
+#   group_by(APN) %>% 
+#   # for parcels with > 1 water system, combine water system names
+#   mutate(CA_DrinkingWater_SvcArea_Name = paste(
+#     CA_DrinkingWater_SvcArea_Name, collapse = "; ")) %>%
+#   ungroup() %>% 
+#   distinct() %>% 
+#   st_drop_geometry() %>% 
+#   select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
+#   # coerce character "NA" to NA
+#   mutate(CA_DrinkingWater_SvcArea_Name = ifelse(
+#     CA_DrinkingWater_SvcArea_Name == "NA", 
+#     NA, CA_DrinkingWater_SvcArea_Name)) 
 
-# sanity check
-# mapview(pet) + mapview(wsa)
-
-# add water service areas to parcel data, first need to summarize data
-# to avoid duplicates where a parcel falls within more than one water system!
-wsa_key <- st_join(pson, wsa) %>% 
-  select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
-  group_by(APN) %>% 
-  # for parcels with > 1 water system, combine water system names
-  mutate(CA_DrinkingWater_SvcArea_Name = paste(
-    CA_DrinkingWater_SvcArea_Name, collapse = "; ")) %>%
-  ungroup() %>% 
-  distinct() %>% 
-  st_drop_geometry() %>% 
-  select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
-  # coerce character "NA" to NA
-  mutate(CA_DrinkingWater_SvcArea_Name = ifelse(
-    CA_DrinkingWater_SvcArea_Name == "NA", 
-    NA, CA_DrinkingWater_SvcArea_Name)) 
+wsa_key <- get_wsa_key(pson, son)
 
 pson <- left_join(pson, wsa_key) %>% 
   mutate(CA_DrinkingWater_SvcArea_Within = 
@@ -298,19 +303,19 @@ pson <- left_join(pson, wsa_key) %>%
 #   filter(Connected =='Yes') %>%
 #   select(APN)
 
-# get edited list of APN's of city of sonoma parcels provided by 0. hart on 10/20/2022
-p <- path(data_path, "son/public_water_connection/city_of_sonoma/city_son_modified_values/city_son_mod.shp")
-son_connect <- st_read(p) %>%
-  select(APN)
-
-
-pson <- pson %>%
-  mutate(
-    CA_DrinkingWater_SvcArea_Within =
-      ifelse(APN %in% son_connect$APN, "Yes", CA_DrinkingWater_SvcArea_Within),
-    CA_DrinkingWater_SvcArea_Name =
-      ifelse(APN %in% son_connect$APN, "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
-  )
+# # get edited list of APN's of city of sonoma parcels provided by 0. hart on 10/20/2022
+# p <- path(data_path, "son/public_water_connection/city_of_sonoma/city_son_modified_values/city_son_mod.shp")
+# son_connect <- st_read(p) %>%
+#   select(APN)
+# 
+# 
+# pson <- pson %>%
+#   mutate(
+#     CA_DrinkingWater_SvcArea_Within =
+#       ifelse(APN %in% son_connect$APN, "Yes", CA_DrinkingWater_SvcArea_Within),
+#     CA_DrinkingWater_SvcArea_Name =
+#       ifelse(APN %in% son_connect$APN, "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
+#   )
 
 # get centroid of city of sonoma parcels provided by 0. hart on 10/20/2022
 # find parcels that overlie these parcels, and then set them as city of sonom water connecetd parcels
@@ -367,75 +372,78 @@ f_verify_non_duplicates()
 # add explicit connection data from Petaluma, Sebastapol, Sonoma, Penngrove,
 # and Valley of the Moon WD - from Shelly on 2022-01-04, Email Subject:
 # Data Revision/Addition | Permit Sonoma GIS: GSA Water Service Connection | ID APN-to-Address
-shelly_path <- path(data_path, "general", "address_apn.gdb")
-cat("Reading in explicit connection data for:\n", 
-    paste(rgdal::ogrListLayers(shelly_path), collapse = "\n "))
-
-
-
-connections_shelly <- rgdal::ogrListLayers(shelly_path) %>% 
-  purrr::map_df(
-    ~rgdal::readOGR(dsn = shelly_path, layer = .x) %>% 
-      st_as_sf() %>% 
-      select(APN))
-
-# if an explicit connection is present from any of the sources above
-# ensure it is represented
-pson <- pson %>% 
-  mutate(
-    Public_Water_Connection = 
-      ifelse(APN %in% connections_shelly$APN, "Yes", "No"),
-    Public_Water_Connection_Modified = NA,
-    Water_Source_Comment = NA
-    )
+# shelly_path <- path(data_path, "general", "address_apn.gdb")
+# cat("Reading in explicit connection data for:\n", 
+#     paste(rgdal::ogrListLayers(shelly_path), collapse = "\n "))
+# 
+# 
+# 
+# connections_shelly <- rgdal::ogrListLayers(shelly_path) %>% 
+#   purrr::map_df(
+#     ~rgdal::readOGR(dsn = shelly_path, layer = .x) %>% 
+#       st_as_sf() %>% 
+#       select(APN))
+# 
+# # if an explicit connection is present from any of the sources above
+# # ensure it is represented
+# pson <- pson %>% 
+#   mutate(
+#     Public_Water_Connection = 
+#       ifelse(APN %in% connections_shelly$APN, "Yes", "No"),
+#     Public_Water_Connection_Modified = NA,
+#     Water_Source_Comment = NA
+#     )
 
 # if there's not explicit connection data (which come from big systems 
 # recorded below), and the system is small and within a water service
 # boundary, then assume a connection is present, because we're unlikely
 # to obtain data from these small systems. exclude city of sonoma becase
 # they have incompelte data
-systems_explicit_data <- c("VALLEY OF THE MOON WATER DISTRICT")
+# systems_explicit_data <- c("VALLEY OF THE MOON WATER DISTRICT")
+# 
+# pson <- pson %>% 
+#   mutate(
+#     Public_Water_Connection = ifelse(
+#       ! CA_DrinkingWater_SvcArea_Name %in% systems_explicit_data & 
+#         !is.na(CA_DrinkingWater_SvcArea_Name),
+#       "Yes",
+#       Public_Water_Connection
+#     )
+#   )
 
-pson <- pson %>% 
-  mutate(
-    Public_Water_Connection = ifelse(
-      ! CA_DrinkingWater_SvcArea_Name %in% systems_explicit_data & 
-        !is.na(CA_DrinkingWater_SvcArea_Name),
-      "Yes",
-      Public_Water_Connection
-    )
-  )
+pson <-add_public_water_connection(pson)
 
 # ensure public water connection is listed for specified Accessor Use Codes
 #accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
 #                          "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
-accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
-                          "Final 2022 Water  Use from Assessor Land Use Code.xlsx")
-pwc_accessor_key <- readxl::read_xlsx(accessor_key_path, 
-                                      sheet = 3, range = "B2:C28") %>% 
-  janitor::clean_names() %>% 
-  mutate(use_code = str_pad(use_code, 4, "left", "0"))
+# accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
+#                           "Final 2022 Water  Use from Assessor Land Use Code.xlsx")
+# pwc_accessor_key <- readxl::read_xlsx(accessor_key_path, 
+#                                       sheet = 3, range = "B2:C28") %>% 
+#   janitor::clean_names() %>% 
+#   mutate(use_code = str_pad(use_code, 4, "left", "0"))
+# 
+# # if the parcel is within a water service area and the use code is listed, 
+# # mark a public water service connection even if not explicitly listed
+# pson <- pson %>% 
+#   mutate(Public_Water_Connection = ifelse(
+#     CA_DrinkingWater_SvcArea_Within == "Yes" & 
+#       UseCode %in% pwc_accessor_key$use_code,
+#     "Yes", Public_Water_Connection
+#   )
+  # )
+pson <-pwc_use_code_fix(pson)
 
-# if the parcel is within a water service area and the use code is listed, 
-# mark a public water service connection even if not explicitly listed
-pson <- pson %>% 
-  mutate(Public_Water_Connection = ifelse(
-    CA_DrinkingWater_SvcArea_Within == "Yes" & 
-      UseCode %in% pwc_accessor_key$use_code,
-    "Yes", Public_Water_Connection
-    )
-  )
-
-# add public water connections for modified APNs:
-apn_add_pwc <- path(data_path, "general/modified_apns.xlsx") %>% 
-  readxl::read_xlsx(sheet = 1) %>% 
-  pull(APN)
-
-pson <- pson %>% 
-  mutate(Public_Water_Connection = ifelse(
-    APN %in% apn_add_pwc,
-    "Yes", Public_Water_Connection)
-  )
+# # add public water connections for modified APNs:
+# apn_add_pwc <- path(data_path, "general/modified_apns.xlsx") %>% 
+#   readxl::read_xlsx(sheet = 1) %>% 
+#   pull(APN)
+# 
+# pson <- pson %>% 
+#   mutate(Public_Water_Connection = ifelse(
+#     APN %in% apn_add_pwc,
+#     "Yes", Public_Water_Connection)
+#   )
 
 f_progress()
 f_verify_non_duplicates()
