@@ -135,6 +135,7 @@ ppet <- ppet %>%
 # # remove intermediate vars
 # select(-area_prop_apn)
 
+check_use_codes(ppet)
 
 f_progress()
 
@@ -546,13 +547,14 @@ f_verify_non_duplicates()
 ppet <- load_urban_wells(data_path, ppet)
 ppet <- replace_urban_well_modified(ppet)
 
-# if there’s an urban well & public water connection, assume 0.1 AF/yr, else 0
-ppet <- ppet %>% 
-  mutate(
-    Urban_Irrigation_GW_Use_Ac_Ft = ifelse(
-      Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
-#Todo Remove '&Public_Water_connection=='Yes' in order remove requirement that parcel has PWC and a well
+# # if there’s an urban well & public water connection, assume 0.1 AF/yr, else 0
+# ppet <- ppet %>% 
+#   mutate(
+#     Urban_Irrigation_GW_Use_Ac_Ft = ifelse(
+#       Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
+# #Todo Remove '&Public_Water_connection=='Yes' in order remove requirement that parcel has PWC and a well
 
+ppet <- calc_urban_irrigation(ppet)
 ppet <- add_urban_irrigation_modified(ppet)
 
 f_progress()

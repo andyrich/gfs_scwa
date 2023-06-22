@@ -131,6 +131,7 @@ pson <- pson %>%
 # select(-area_prop_apn)
 
 
+nmissing<-check_use_codes(pson)
 
 
 f_progress()
@@ -248,7 +249,7 @@ pson <- pson %>% replace_Onsite_Well_modified() %>%
   replace_shared_well_modified() %>%
   replace_active_well_modified()
   
-
+ 
 f_progress()
 f_verify_non_duplicates()
 
@@ -413,6 +414,9 @@ f_verify_non_duplicates()
 
 pson <-add_public_water_connection(pson)
 
+nmissing<-check_use_codes(pson,nmissing)
+
+
 # ensure public water connection is listed for specified Accessor Use Codes
 #accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
 #                          "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
@@ -434,6 +438,8 @@ pson <-add_public_water_connection(pson)
   # )
 pson <-pwc_use_code_fix(pson)
 
+nmissing<-check_use_codes(pson,nmissing)
+
 # # add public water connections for modified APNs:
 # apn_add_pwc <- path(data_path, "general/modified_apns.xlsx") %>% 
 #   readxl::read_xlsx(sheet = 1) %>% 
@@ -452,15 +458,15 @@ f_verify_non_duplicates()
 # urban wells -------------------------------------------------------------
 
 # explicit connection data from VOMWD (Valley of Moon water district)
-vomwd_apn_st <- path(data_path, "son", "public_water_connection", 
-                     "VOMWD Data August 2021", 
-                     "Master Location & Backflow data.xlsx") %>% 
-  readxl::read_xlsx(sheet = 1) %>% 
-  select(APN = `Parcel Number`, st_no = `Street Number`, st = `Street Name`) %>% 
-  filter(!is.na(APN)) %>% 
-  mutate(st = paste(st_no, st)) %>% 
-  select(-st_no) %>% 
-  distinct()
+# vomwd_apn_st <- path(data_path, "son", "public_water_connection", 
+#                      "VOMWD Data August 2021", 
+#                      "Master Location & Backflow data.xlsx") %>% 
+#   readxl::read_xlsx(sheet = 1) %>% 
+#   select(APN = `Parcel Number`, st_no = `Street Number`, st = `Street Name`) %>% 
+#   filter(!is.na(APN)) %>% 
+#   mutate(st = paste(st_no, st)) %>% 
+#   select(-st_no) %>% 
+#   distinct()
 
 # get APNs of parcels with an urban well connection, see 2021-09-13 email
 # from Rob Pennington for methods: VOMWD  Urban Well Use Logic
@@ -526,6 +532,7 @@ res_use_accessor_key <- readxl::read_xlsx(accessor_key_path,
 
 #TODO check UseCode Modified option
 pson <- replace_use_code(pson)
+nmissing<-check_use_codes(pson,nmissing)
 
 # add Residential and Commercial Water Use based on Accessor Code
 pson <- left_join(pson, res_use_accessor_key) 
@@ -541,6 +548,7 @@ pson <- pson %>%
 
 # load modified fields
 pson <- join_with_modified(pson)
+nmissing<-check_use_codes(pson,nmissing)
 
 # blank fields to permit revision of the data
 pson <- pson %>% 
@@ -585,13 +593,9 @@ f_verify_non_duplicates()
 pson <- load_urban_wells(data_path, pson)
 pson <- replace_urban_well_modified(pson)
 
-# if there’s an urban well & public water connection, assume 0.1 AF/yr, else 0
-pson <- pson %>% 
-  mutate(
-    Urban_Irrigation_GW_Use_Ac_Ft = ifelse(
-      Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
-
+pson <- calc_urban_irrigation(pson)
 pson <- add_urban_irrigation_modified(pson)
+
 
 
 f_progress()
@@ -923,6 +927,7 @@ pson <- pson %>%
   # make all NAs in these columns go to zero
   mutate(across(ends_with("Determination"), ~ifelse(is.na(.x), "No", .x)))
   
+nmissing<-check_use_codes(pson)
 f_progress()
 f_verify_non_duplicates()
 
@@ -961,6 +966,7 @@ pson <- mutate(pson,Total_Groundwater_Use_Ac_Ft =
 
 
 # final manual tests ------------------------------------------------------
+nmissing<-check_use_codes(pson)
 
 # drop no longer needed UseCode column
 #pson <- select(pson, -UseCode)

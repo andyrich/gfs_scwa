@@ -98,6 +98,7 @@ psrp <- psrp %>% select(-all_of(rem))
 cat("Removed", length(rem), "fields from parcel database.\n   ",
     paste(rem, collapse = "\n    "))
 
+nmissing<-check_use_codes(psrp)
 
 print(colnames(psrp))
 # colstodrop = c(
@@ -231,6 +232,7 @@ psrp <- psrp %>%
   mutate(GSA_Jurisdiction_Prelim = "Santa Rosa Plain",
          Basin_Boundary_Parcel = edge)%>% select(-edge)
 
+nmissing<-check_use_codes(psrp,nmissing)
 
 f_progress()
 
@@ -280,6 +282,7 @@ psrp <- left_join(psrp, recy, by = "APN") %>%
     !is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No"))
 
 
+nmissing<-check_use_codes(psrp,nmissing)
 
 print('here is the sum of the recycled water before adding modified')
 print(psrp %>%
@@ -296,6 +299,8 @@ print(psrp %>%
         st_drop_geometry() %>%
         select(Recycled_Water_Use_Ac_Ft)  %>%
         colSums(na.rm = TRUE))
+
+nmissing<-check_use_codes(psrp,nmissing)
 
 # recycled water delivered to parcels in 2016 (from billy.dixon@scwa.ca.gov)
 # recy <- path(data_path, 
@@ -358,6 +363,7 @@ psrp <- left_join(psrp, ewrims_key) %>%
 psrp <- add_surface_water_modified(psrp)
 
 psrp <- add_surface_water_connection_modified(psrp)
+nmissing<-check_use_codes(psrp,nmissing)
 
 
 f_progress()
@@ -419,13 +425,15 @@ psrp <- psrp %>%
 # f_progress()
 # f_verify_non_duplicates()
 
+nmissing<-check_use_codes(psrp,nmissing)
+
 psrp <- psrp %>% replace_Onsite_Well_modified() %>%
   replace_Well_Records_Available_modified() %>%
   replace_shared_well_APN_modified() %>%
   replace_shared_well_modified() %>%
   replace_active_well_modified()
 
-
+nmissing<-check_use_codes(psrp,nmissing)
 ## water service areas ----------------------------------------------------
 
 # water service areas in SON
@@ -504,6 +512,7 @@ psrp <- left_join(psrp, wsa_key) %>%
 
 f_verify_non_duplicates()
 
+nmissing<-check_use_codes(psrp,nmissing)
 # add explicit connection data from Petaluma, Sebastapol, Sonoma, Penngrove,
 # and Valley of the Moonb WD - from Shelly on 2022-01-04, Email Subject:
 # Data Revision/Addition | Permit Sonoma GIS: GSA Water Service Connection | ID APN-to-Address
@@ -552,7 +561,7 @@ f_verify_non_duplicates()
 #   )
 
 psrp <-add_public_water_connection(psrp)
-
+nmissing<-check_use_codes(psrp,nmissing)
 
 # ensure public water connection is listed for specified Accessor Use Codes
 #accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
@@ -573,8 +582,9 @@ psrp <-add_public_water_connection(psrp)
 #     "Yes", Public_Water_Connection
 #   )
 #   )
-
+nmissing<-check_use_codes(psrp,nmissing)
 psrp <-pwc_use_code_fix(psrp)
+
 
 # add public water connections for modified APNs: 
 # TODO: verify this should  be here. it is already incorporated above. Maybe being re-done
@@ -707,6 +717,8 @@ res_use_accessor_key <- readxl::read_xlsx(accessor_key_path,
 #TODO check UseCode Modified option
 psrp <- replace_use_code(psrp)
 
+nmissing<-check_use_codes(psrp,nmissing)
+
 psrp <- left_join(psrp, res_use_accessor_key)
 
 # Res_GW_Use_Prelim_Ac_Ft is Res_W_Use_Assessor_Ac_Ft if
@@ -732,7 +744,7 @@ psrp <- psrp %>%
 # f_progress()
 # f_verify_non_duplicates()
 
-
+nmissing<-check_use_codes(psrp,nmissing)
 # commercial water use ----------------------------------------------------
 
 
@@ -767,13 +779,15 @@ psrp <- load_urban_wells(data_path, psrp)
 psrp <- replace_urban_well_modified(psrp)
 
 # if there’s an urban well & public water connection, assume 0.1 AF/yr, else 0
-psrp <- psrp %>%
-  mutate(
-    Urban_Irrigation_GW_Use_Ac_Ft = ifelse(
-      Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
+# psrp <- psrp %>%
+#   mutate(
+#     Urban_Irrigation_GW_Use_Ac_Ft = ifelse(
+#       Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
 
+psrp <- calc_urban_irrigation(psrp)
 psrp <- add_urban_irrigation_modified(psrp)
 
+nmissing<-check_use_codes(psrp,nmissing)
 
 # f_progress()
 # f_verify_non_duplicates()

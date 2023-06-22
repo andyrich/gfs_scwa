@@ -49,3 +49,31 @@ get_schema_path <-function(data_path){
              '2023_05_31 GSA Schema from RP.xlsx')
   return(s_)
 }
+
+
+check_use_codes <-function(parcel, check_missing){
+  
+  
+  if (missing(check_missing)) {
+    print(paste('The number of nulls in parcel UseCode:', 
+                sum(is.na(parcel$UseCode)) , sep = " "))
+    return(sum(is.na(parcel$UseCode)))
+    
+  }
+  else {
+  print(paste('The number of nulls in parcel UseCode:',
+  sum(is.na(parcel$UseCode)), 'it was previously', 
+  check_missing, sep = " "))
+  if (sum(is.na(parcel$UseCode))==check_missing){
+  return(check_missing)
+  }
+  else {
+  stop(paste("the number of missing UseCodes has changed. It was ",
+             check_missing,
+             'and is now',
+             sum(is.na(parcel$UseCode)), sep = ' ' ))
+  }
+
+  }
+  
+}
