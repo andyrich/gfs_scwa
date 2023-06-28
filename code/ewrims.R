@@ -62,7 +62,7 @@ yearly<-dfill
 yearly<-data.frame(yearly) 
 
 
-write_csv(yearly, here(data_path,"general/ewrims/water_rights_v3/ewrims_yearly_alldata.csv") )
+write_csv(rownames_to_column(yearly, var = "APPLICATION_NUMBER"), here(data_path,"general/ewrims/water_rights_v3/ewrims_yearly_alldata.csv") )
 
 
 yearly<-yearly[,(ncol(yearly)-5-1):ncol(yearly)]
