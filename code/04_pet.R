@@ -25,6 +25,9 @@ print('done deleting')
 gw_use_rate = 40.00 #$ per AF
 unsub_gw_sub_rate = 147.0 #unsubsidized rate
 
+accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
+                          "Final 2022 Water Use from Assessor Land Use Code.xlsx")
+
 # load data ---------------------------------------------------------------
 
 
@@ -132,6 +135,7 @@ ppet <- ppet %>%
 # # remove intermediate vars
 # select(-area_prop_apn)
 
+check_use_codes(ppet)
 
 f_progress()
 
@@ -262,40 +266,41 @@ f_verify_non_duplicates()
 ## water service areas ----------------------------------------------------
 
 # water service areas in SON
-wsa <- path(data_path, "general", "water_system_boundaries",
-            "SABL_Public_083121/SABL_Public_083121.shp") %>% 
-  st_read() %>% 
-  st_transform(epsg) %>% 
-  st_intersection(pet) %>% 
-  select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1)
+# wsa <- path(data_path, "general", "water_system_boundaries",
+#             "SABL_Public_083121/SABL_Public_083121.shp") %>% 
+#   st_read() %>% 
+#   st_transform(epsg) %>% 
+#   st_intersection(pet) %>% 
+#   select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1)
+# 
+# # sanity check
+# # mapview(pet) + mapview(wsa)
+# 
+# # list of water service areas to remove
+# wsa_remove = c('PETALUMA, CITY OF',
+#                'PENNGROVE WATER COMPANY (PUC)',
+#                'COTATI, CITY OF',
+#                'ROHNERT PARK, CITY OF')
+# 
+# # add water service areas to parcel data, first need to summarize data
+# # to avoid duplicates where a parcel falls within more than one water system!
+# wsa_key <- st_join(ppet, wsa) %>% 
+#   select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
+#   subset(!(CA_DrinkingWater_SvcArea_Name %in% wsa_remove)) %>%
+#   group_by(APN) %>% 
+#   # for parcels with > 1 water system, combine water system names
+#   mutate(CA_DrinkingWater_SvcArea_Name = paste(
+#     CA_DrinkingWater_SvcArea_Name, collapse = "; ")) %>%
+#   ungroup() %>% 
+#   distinct() %>% 
+#   st_drop_geometry() %>% 
+#   select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
+#   # coerce character "NA" to NA
+#   mutate(CA_DrinkingWater_SvcArea_Name = ifelse(
+#     CA_DrinkingWater_SvcArea_Name == "NA", 
+#     NA, CA_DrinkingWater_SvcArea_Name))
 
-# sanity check
-# mapview(pet) + mapview(wsa)
-
-# list of water service areas to remove
-wsa_remove = c('PETALUMA, CITY OF',
-               'PENNGROVE WATER COMPANY (PUC)',
-               'COTATI, CITY OF',
-               'ROHNERT PARK, CITY OF')
-
-# add water service areas to parcel data, first need to summarize data
-# to avoid duplicates where a parcel falls within more than one water system!
-wsa_key <- st_join(ppet, wsa) %>% 
-  select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
-  subset(!(CA_DrinkingWater_SvcArea_Name %in% wsa_remove)) %>%
-  group_by(APN) %>% 
-  # for parcels with > 1 water system, combine water system names
-  mutate(CA_DrinkingWater_SvcArea_Name = paste(
-    CA_DrinkingWater_SvcArea_Name, collapse = "; ")) %>%
-  ungroup() %>% 
-  distinct() %>% 
-  st_drop_geometry() %>% 
-  select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
-  # coerce character "NA" to NA
-  mutate(CA_DrinkingWater_SvcArea_Name = ifelse(
-    CA_DrinkingWater_SvcArea_Name == "NA", 
-    NA, CA_DrinkingWater_SvcArea_Name))
-
+wsa_key <- get_wsa_key(ppet, pet)
 
 ppet <- left_join(ppet, wsa_key) %>% 
   mutate(CA_DrinkingWater_SvcArea_Within = 
@@ -308,97 +313,99 @@ f_verify_non_duplicates()
 # add explicit connection data from Petaluma, Sebastapol, Sonoma, Penngrove,
 # and Valley of the Moonb WD - from Shelly on 2022-01-04, Email Subject:
 # Data Revision/Addition | Permit Sonoma GIS: GSA Water Service Connection | ID APN-to-Address
-shelly_path <- path(data_path, "general", "address_apn.gdb")
-cat("Reading explicit connection data for:\n", 
-    paste(rgdal::ogrListLayers(shelly_path), collapse = "\n "), "\n")
-
-print('using the following layer from shellys list')
-print(rgdal::ogrListLayers(shelly_path)[1])
-
-#adding all of the connections to the database, not just the first one.
-connections_shelly <- rgdal::ogrListLayers(shelly_path) %>% 
-  purrr::map_df(
-    ~rgdal::readOGR(dsn = shelly_path, layer = .x) %>% 
-      # st_drop_geometry() %>%
-      st_as_sf() %>%
-      select(APN))
-
-print('these are the connections_shelly')
-print(connections_shelly)
-print(dim(connections_shelly))
-
-petaluma_connect_path <- path(data_path, "pet","public_water_connection", "WaterServiceParcels_2020.xlsx")
-petaluma_connect <- petaluma_connect_path %>% 
-  readxl::read_xlsx(sheet = 1) %>% 
-  select(APN)
-
-print('these are the petaluma_connect')
-print(petaluma_connect)
-print(dim(petaluma_connect))
-
-allconnects <- bind_rows(petaluma_connect, connections_shelly)
-
-print('these are the allconnects')
-print(allconnects)
-print(dim(allconnects))
-
-# if an explicit connection is present, ensure it is represented
-ppet <- ppet %>% 
-  mutate(
-    Public_Water_Connection = 
-      ifelse(APN %in% allconnects$APN |
-               !is.na(CA_DrinkingWater_SvcArea_Name), 
-             "Yes", "No"),
-    Public_Water_Connection_Modified = NA,
-    Water_Source_Comment = NA
-  )
+# shelly_path <- path(data_path, "general", "address_apn.gdb")
+# cat("Reading explicit connection data for:\n", 
+#     paste(rgdal::ogrListLayers(shelly_path), collapse = "\n "), "\n")
+# 
+# print('using the following layer from shellys list')
+# print(rgdal::ogrListLayers(shelly_path)[1])
+# 
+# #adding all of the connections to the database, not just the first one.
+# connections_shelly <- rgdal::ogrListLayers(shelly_path) %>% 
+#   purrr::map_df(
+#     ~rgdal::readOGR(dsn = shelly_path, layer = .x) %>% 
+#       # st_drop_geometry() %>%
+#       st_as_sf() %>%
+#       select(APN))
+# 
+# print('these are the connections_shelly')
+# print(connections_shelly)
+# print(dim(connections_shelly))
+# 
+# petaluma_connect_path <- path(data_path, "pet","public_water_connection", "WaterServiceParcels_2020.xlsx")
+# petaluma_connect <- petaluma_connect_path %>% 
+#   readxl::read_xlsx(sheet = 1) %>% 
+#   select(APN)
+# 
+# print('these are the petaluma_connect')
+# print(petaluma_connect)
+# print(dim(petaluma_connect))
+# 
+# allconnects <- bind_rows(petaluma_connect, connections_shelly)
+# 
+# print('these are the allconnects')
+# print(allconnects)
+# print(dim(allconnects))
+# 
+# # if an explicit connection is present, ensure it is represented
+# ppet <- ppet %>% 
+#   mutate(
+#     Public_Water_Connection = 
+#       ifelse(APN %in% allconnects$APN |
+#                !is.na(CA_DrinkingWater_SvcArea_Name), 
+#              "Yes", "No"),
+#     Public_Water_Connection_Modified = NA,
+#     Water_Source_Comment = NA
+#   )
 
 
 # ensure public water connection is listed for specified Accessor Use Codes
 #accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
 #                          "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
-accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
-                          "Final 2022 Water  Use from Assessor Land Use Code.xlsx")
-pwc_accessor_key <- accessor_key_path %>% 
-  readxl::read_xlsx(sheet = 3, range = "B2:C28") %>% 
-  janitor::clean_names() %>% 
-  mutate(use_code = str_pad(use_code, 4, "left", "0"))
+# accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
+#                           "Final 2022 Water  Use from Assessor Land Use Code.xlsx")
+# pwc_accessor_key <- accessor_key_path %>% 
+#   readxl::read_xlsx(sheet = 3, range = "B2:C28") %>% 
+#   janitor::clean_names() %>% 
+#   mutate(use_code = str_pad(use_code, 4, "left", "0"))
+# 
+# # if the parcel is within a water service area and the use code is listed, 
+# # mark a public water service connection even if not explicitly listed
+# ppet <- ppet %>% 
+#   mutate(Public_Water_Connection = ifelse(
+#     CA_DrinkingWater_SvcArea_Within == "Yes" & 
+#       UseCode %in% pwc_accessor_key$use_code,
+#     "Yes", Public_Water_Connection)
+#   )
+# 
+# # add public water connections for modified APNs:
+# apn_add_pwc <- path(data_path, "general/modified_apns.xlsx") %>% 
+#   readxl::read_xlsx(sheet = 1) %>% 
+#   pull(APN)
+# 
+# ppet <- ppet %>% 
+#   mutate(Public_Water_Connection = ifelse(
+#     APN %in% apn_add_pwc,
+#     "Yes", Public_Water_Connection)
+#   )
+# 
+# # Permit Sonoma wells to remove
+# ps_wells <- path(data_path, "pet/public_water_connection",
+#                  "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
+#   readxl::read_xlsx(sheet = 3) %>% 
+#   #select(APN) 
+#   pull(APN)
+# 
+# #Use the Petaluma CROSSCONNECTION DATA CLEANED #3 to remove parcels from 
+# #the Public_Water_Connection list. set them to 'no' 
+# ppet <- ppet %>% 
+#   mutate(Public_Water_Connection = ifelse(
+#     APN %in% ps_wells,
+#      "No", Public_Water_Connection)
+#   )
 
-# if the parcel is within a water service area and the use code is listed, 
-# mark a public water service connection even if not explicitly listed
-ppet <- ppet %>% 
-  mutate(Public_Water_Connection = ifelse(
-    CA_DrinkingWater_SvcArea_Within == "Yes" & 
-      UseCode %in% pwc_accessor_key$use_code,
-    "Yes", Public_Water_Connection)
-  )
-
-# add public water connections for modified APNs:
-apn_add_pwc <- path(data_path, "general/modified_apns.xlsx") %>% 
-  readxl::read_xlsx(sheet = 1) %>% 
-  pull(APN)
-
-ppet <- ppet %>% 
-  mutate(Public_Water_Connection = ifelse(
-    APN %in% apn_add_pwc,
-    "Yes", Public_Water_Connection)
-  )
-
-# Permit Sonoma wells to remove
-ps_wells <- path(data_path, "pet/public_water_connection",
-                 "Petaluma CROSSCONNECTION DATA CLEANED.xlsx") %>% 
-  readxl::read_xlsx(sheet = 3) %>% 
-  #select(APN) 
-  pull(APN)
-
-#Use the Petaluma CROSSCONNECTION DATA CLEANED #3 to remove parcels from 
-#the Public_Water_Connection list. set them to 'no' 
-ppet <- ppet %>% 
-  mutate(Public_Water_Connection = ifelse(
-    APN %in% ps_wells,
-     "No", Public_Water_Connection)
-  )
-
+ppet <-add_public_water_connection(ppet)
+ppet <-pwc_use_code_fix(ppet)
 
 f_progress()
 f_verify_non_duplicates()
@@ -540,13 +547,14 @@ f_verify_non_duplicates()
 ppet <- load_urban_wells(data_path, ppet)
 ppet <- replace_urban_well_modified(ppet)
 
-# if there’s an urban well & public water connection, assume 0.1 AF/yr, else 0
-ppet <- ppet %>% 
-  mutate(
-    Urban_Irrigation_GW_Use_Ac_Ft = ifelse(
-      Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
-#Todo Remove '&Public_Water_connection=='Yes' in order remove requirement that parcel has PWC and a well
+# # if there’s an urban well & public water connection, assume 0.1 AF/yr, else 0
+# ppet <- ppet %>% 
+#   mutate(
+#     Urban_Irrigation_GW_Use_Ac_Ft = ifelse(
+#       Urban_Well == "Yes" & Public_Water_Connection == "Yes", 0.1, 0))
+# #Todo Remove '&Public_Water_connection=='Yes' in order remove requirement that parcel has PWC and a well
 
+ppet <- calc_urban_irrigation(ppet)
 ppet <- add_urban_irrigation_modified(ppet)
 
 f_progress()

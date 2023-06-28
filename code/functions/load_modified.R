@@ -13,8 +13,17 @@ load_modified_single <- function(sheetname, col1, col2){
   
   #extra row with APN='APN' is being added. so removing here.
   df <- filter(df,!df$APN=='APN')
-  print(colnames(df))
   
+  # check if there are zero rows. empty df creates column types such as logical 
+  # that cannot be joined with APN
+  
+  if (nrow(df)==0){
+    print(paste("there are zero rows for", sheetname, '\nsetting dtypes', sep = ' '))
+    for(i in 1:ncol(df)) {
+      df[,i] <- as.character(df[,i])
+    }
+  }
+
   return(df)}
 
 reduce_dfs <- function(...){
@@ -107,16 +116,16 @@ replace_use_code <- function(parcel) {
 add_urban_irrigation_modified <- function(parcel) {
   print('loading urban irrigation modified')
   df <- load_modified_single('Urban_Irrigation_Modified', 'Urban_Irrigation_Modified_Ac_Ft', 'Urban_Irrigation_GW_Use_Comment')
-
+  
 
   parcel <- left_join(parcel, df)  %>%
     mutate(
-      Urban_Irrigation_GW_Use_Prelim_Ac_Ft = Urban_Irrigation_GW_Use_Ac_Ft,
+      Urban_Irrigation_Modified = replace_na(Urban_Irrigation_Modified, "No"),
       Urban_Irrigation_GW_Use_Ac_Ft   = ifelse(
         Urban_Irrigation_Modified == "Yes",
         Urban_Irrigation_Modified_Ac_Ft,
         Urban_Irrigation_GW_Use_Prelim_Ac_Ft))
-
+  
   return(parcel)
 }
 
