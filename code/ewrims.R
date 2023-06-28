@@ -2,9 +2,10 @@ library(tidyverse)
 library(fs)
 library(here)
 library(sf)
+library(zoo)
 
 data_path <- Sys.getenv("DATA_PATH")
-epsg <- as.numeric(Sys.getenv("EPSG"))
+# epsg <- as.numeric(Sys.getenv("EPSG"))
 
 
 # this script reads all of the ewrims annual reports. it filters reported water use > than face value
@@ -43,27 +44,39 @@ yearly<- sw %>%
   subset( (APPLICATION_NUMBER %in% frac$APPLICATION_NUMBER)) %>%
   pivot_wider(names_from = YEAR, values_from = GSA_DIVERSION)
 
-yearly[is.na(yearly)] <- 0
+
+yearly<-column_to_rownames(yearly, var = "APPLICATION_NUMBER")
 
 
+# print(yearly)
+#fill yearly values to the RIGHT after any reported values, keep na to left.
+dfi<-yearly
+c <- !is.na(yearly)
+dfi[c]<-0
+
+dfill<- t(na.locf(t(yearly), fromLast = FALSE ))
+
+dfill[c]<-yearly[c]
+yearly<-dfill
+
+yearly<-data.frame(yearly) 
 
 
-
-yearly$MEAN_GSA_DIVERSION <- rowMeans(yearly[-1])
-
+write_csv(rownames_to_column(yearly, var = "APPLICATION_NUMBER"), here(data_path,"general/ewrims/water_rights_v3/ewrims_yearly_alldata.csv") )
 
 
+yearly<-yearly[,(ncol(yearly)-5-1):ncol(yearly)]
+yearly$MEAN_GSA_DIVERSION <- rowMeans(yearly, na.rm = TRUE) 
 
-summary <- yearly %>%select(MEAN_GSA_DIVERSION)
 
-print(sum(yearly$MEAN_GSA_DIVERSION))
-print(summary)
+yearly <-rownames_to_column(yearly, var = "APPLICATION_NUMBER")
+
+summary <- yearly %>%select(APPLICATION_NUMBER, MEAN_GSA_DIVERSION)
 
 
 # write_csv(summary, here("data_output/ewrims_summary.csv"))
-write_csv(yearly, here(data_path,"general/ewrims/water_rights_v3/ewrims_yearly.csv"))
-write_csv(summary, here(data_path,"general/ewrims/water_rights_v3/ewrims_summary.csv"))
-
+write_csv(yearly, here(data_path,"general/ewrims/water_rights_v3/ewrims_yearly.csv") )
+write_csv(summary, here(data_path,"general/ewrims/water_rights_v3/ewrims_summary.csv") )
 
 
 ewrims_final <- inner_join(summary, frac, by = 'APPLICATION_NUMBER')  %>%
