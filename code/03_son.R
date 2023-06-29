@@ -65,19 +65,8 @@ rem  <- rem[-length(rem)] # don't remove the geometry column
 
 # parcel and contact info -------------------------------------------------
 
-pson <- pson %>% 
-  mutate(
-    # parcel and contact info
-    LandSizeAcres       = LndSzAcre, # this value gets changed below
-    LandSizeParcelAcres = LandSizeAcres,
-    UseCode_Description = UseCDesc,
-    UseCode_Category    = UseCType,
-    CurrentOwnerName    = NA,
-    MailingAddress1     = MailAdr1,
-    MailingAddress2     = MailAdr2,
-    MailingAddress3     = MailAdr3,
-    MailingAddress4     = MailAdr4,
-    Situs_Address       = SitusFmt1)
+pson <-parcel_contact(pson)
+
 f_progress()
 
 pson <- pson %>%
@@ -96,39 +85,7 @@ cat("Removed", length(rem), "fields from parcel database.\n   ",
 
 # Does the parcel overlap SRP, Petaluma, or Sonoma Valley basins?
 # we expect SON overlaps only with PET, see map below:
-# mapview::mapview(list(son, pet, srp))
-
-# # parcels that intersect multiple basins have duplicate APN across databases
-# boundary_parcels <- pson$APN[pson$APN %in% ppet$APN]
-
-pson <- pson %>% 
-  mutate(
-    # Add parcel size
-    LandSizeParcelAcres = LandSizeAcres,
-    # Is the parcel a boundary parcel
-    Basin_Boundary_Parcel = edge,
-    # Basin_Boundary_Parcel = ifelse(APN %in% boundary_parcels, "Yes", "No"),
-    # area of the total APN across both GSAs is the recorded APN area
-    Intersect_GSA_Bndry_Sum_Acres = ifelse(edge =='Yes',
-                                           LandSizeAcres, NA),
-    # adjust area of the bisected parcels in the GSA. remember, we clipped 
-    # to the B118 basin polygon, so the area is just the calculated area!
-    LandSizeAcres = ifelse(
-      edge =='Yes',
-      as.numeric(units::set_units(st_area(geometry), acres)), 
-      LandSizeAcres
-    ),
-    # # proportion of the APN in this GSA, used to assign a GSA
-    # area_prop_apn = LandSizeAcres / Intersect_GSA_Bndry_Sum_Acres,
-    GSA_Jurisdiction_Prelim = 'Sonoma Valley',
-    # intentionally left blank for clients to evaluate and populate
-    GSA_Jurisdiction_Modified = NA,
-    GSA_Jurisdiction_Mod_Value = NA,
-    GSA_Jurisdiction = NA
-  ) 
-# %>% 
-# # remove intermediate vars
-# select(-area_prop_apn)
+pson <- fill_parcel_info(pson, 'Sonoma Valley')
 
 
 nmissing<-check_use_codes(pson)
@@ -139,10 +96,6 @@ f_progress()
 # ### add parcel land size
 # pson <- load_land_size(data_path, pson)
 
-# sanity check
-# mapview(pet, alpha.regions = 0) + 
-#   mapview(son, alpha.regions = 0) + 
-#   mapview(pson, zcol = "Basin_Boundary_Parcel")
 
 
 # water sources -----------------------------------------------------------

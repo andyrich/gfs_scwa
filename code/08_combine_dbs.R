@@ -47,9 +47,8 @@ dup <- Reduce(rbind,
 
 all <- bind_rows(dup, nondup)
 
-all$GSA_Jurisdiction_Modified <-'No'
-all$GSA_Jurisdiction_Mod_Value <-NA
-all$GSA_Jurisdiction <-all$GSA_Jurisdiction_Prelim
+all <-add_gsa_jurisdiction_modified(all)
+
 
 parcel_old <- path(
   data_path, "data_output/archive/output_as_of_05162023/soco_gsas_parcel.csv")
@@ -71,10 +70,11 @@ all <- left_join(all, old, by='APN') %>%
 
 
 # write to shp and csv
-print('done writing csv output')
+
 all %>% 
   st_drop_geometry() %>% 
   write_csv(path(data_path, "data_output/soco_gsas_parcel.csv"))
+print('done writing csv output')
 
 gjson_out <- path(data_path, "data_output/soco_gsas_parcel.geojson")
 shp_out   <- path(data_path, "data_output/shp/soco_gsas_parcel.shp")

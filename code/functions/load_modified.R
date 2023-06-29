@@ -302,3 +302,24 @@ replace_urban_well_modified <- function(parcel) {
   
   return(parcel)
 }
+
+add_gsa_jurisdiction_modified <- function(parcel) {
+  
+  df <- load_modified_single('GSA_Jurisdiction_Modified', 'GSA_Jurisdiction_Mod_Value', 'Comment')
+  
+  df$Comment <- NULL
+
+  print(paste("number of rosw before filtering for Jurisdiction==Outside", nrow(parcel), sep = ' '))
+  parcel <- left_join(parcel, df) %>%
+    mutate(GSA_Jurisdiction_Modified = replace_na(GSA_Jurisdiction_Modified,"No"),
+           GSA_Jurisdiction = if_else(GSA_Jurisdiction_Modified=='Yes', 
+                                      GSA_Jurisdiction_Mod_Value, 
+                                      GSA_Jurisdiction_Prelim)) %>%
+   filter(!(GSA_Jurisdiction=="Outside"))
+  
+  print(paste("number of rosw after filtering", nrow(parcel), sep = ' '))
+  
+  return(parcel)
+}
+
+
