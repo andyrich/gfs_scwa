@@ -323,3 +323,20 @@ add_gsa_jurisdiction_modified <- function(parcel) {
 }
 
 
+add_cannabis_modified <- function(parcel) {
+  print('loading cannabis modified')
+  df <- load_modified_single('Cannabis_Water_Use_Modified', 'Cannabis_Water_Use_Modified_Ac_Ft', 'Cannabis_Water_Use_Comment')
+  
+  
+  parcel <- left_join(parcel, df)  %>%
+    mutate(
+      Cannabis_Water_Use_Prelim_Ac_Ft = 0,
+      Cannabis_Water_Use_Modified = replace_na(Cannabis_Water_Use_Modified, "No"),
+      Cannabis_Water_Use_Ac_Ft_Rate   = ifelse(
+        Cannabis_Water_Use_Modified == "Yes",
+        Cannabis_Water_Use_Modified_Ac_Ft,
+        Cannabis_Water_Use_Prelim_Ac_Ft))
+  
+  return(parcel)
+}
+

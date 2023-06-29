@@ -69,9 +69,6 @@ pson <-parcel_contact(pson)
 
 f_progress()
 
-pson <- pson %>%
-  mutate(Jurisdiction = ifelse(CityType == 'Incorporated',
-                               POCity, 'Unincorporated Sonoma County'))
 
 # remove fields -----------------------------------------------------------
 
@@ -147,52 +144,8 @@ f_verify_non_duplicates()
 
 ## wells ------------------------------------------------------------------
 # Sonoma county wells - deduplicate
-scwells <- path(data_path, "general", 
-                "soco_wells/all_soco_wells_spatial.shp") %>% 
-  st_read() %>% 
-  st_transform(epsg) %>% 
-  st_intersection(select(pson, APN)) %>%
-  add_count(APN, name = "Well_Count") %>% 
-  group_by(APN) %>% 
-  mutate(Well_Log_Nos = paste(Log_No, collapse = "; ")) %>% 
-  slice(1) %>% 
-  ungroup() %>% 
-  select(APN, Well_Count, Well_Log_Nos) %>% 
-  st_drop_geometry()
-
-# DEPRICATED: just know that more detailed well data is here
-# Sonoma count well data - deduplicate
-# scwells_data <- path(data_path, "general", 
-#                      "soco_wells/all_sonoma_county_wells.xlsx") %>% 
-#   readxl::read_xlsx() %>% 
-#   select(APN:OtherObservations) %>% 
-#   group_by(Log_No) %>% 
-#   slice(1) %>% 
-#   ungroup()
-
-# DEPRICATED: simplified by joining spatial well data to pson above
-# combine and return vector of APNs with a well present
-# scwells_apn <- left_join(scwells, scwells_data, by = "Log_No") %>% 
-#   # There is a lot of WCR data we're dropping, but it's all there!
-#   select(Log_No) %>% 
-#   st_intersection(select(pson, APN)) %>% 
-#   pull(APN) %>% 
-#   unique()
-
-# populate database columns
-pson <- pson %>% 
-  left_join(scwells) %>% 
-  mutate(
-    # no well count means 0 onsite wells
-    Well_Count = ifelse(is.na(Well_Count), 0, Well_Count),
-    Active_Well = ifelse(Well_Count > 0, "Yes", "No"),
-    # Shared_Well = "No", # placeholder for future review
-    # Shared_Well_APN = '', # placeholder for future review
-    Well_Records_Available = ifelse(Well_Count > 0, "Yes", "No"),
-    Onsite_Well = 
-      ifelse(Active_Well == "Yes" | Well_Records_Available == "Yes", 
-             "Yes", "No")
-  ) 
+scwells <- add_wells(pson)
+pson <-calc_wells(pson, scwells)
 
 
 
@@ -200,7 +153,7 @@ pson <- pson %>% replace_Onsite_Well_modified() %>%
   replace_Well_Records_Available_modified() %>%
   replace_shared_well_APN_modified() %>%
   replace_shared_well_modified() %>%
-  replace_active_well_modified()
+  replace_active_well_modified() 
   
  
 f_progress()
@@ -209,34 +162,6 @@ f_verify_non_duplicates()
 
 ## water service areas ----------------------------------------------------
 
-# water service areas in SON
-# wsa <- path(data_path, "general", "water_system_boundaries",
-#             "SABL_Public_083121/SABL_Public_083121.shp") %>% 
-#   st_read() %>% 
-#   st_transform(epsg)  %>%
-#   st_intersection(son) %>% 
-#   select(CA_DrinkingWater_SvcArea_Name = WATER_SY_1,
-#          pwsid = SABL_PWSID) 
-# 
-# # sanity check
-# # mapview(pet) + mapview(wsa)
-# 
-# # add water service areas to parcel data, first need to summarize data
-# # to avoid duplicates where a parcel falls within more than one water system!
-# wsa_key <- st_join(pson, wsa) %>% 
-#   select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
-#   group_by(APN) %>% 
-#   # for parcels with > 1 water system, combine water system names
-#   mutate(CA_DrinkingWater_SvcArea_Name = paste(
-#     CA_DrinkingWater_SvcArea_Name, collapse = "; ")) %>%
-#   ungroup() %>% 
-#   distinct() %>% 
-#   st_drop_geometry() %>% 
-#   select(APN, CA_DrinkingWater_SvcArea_Name) %>% 
-#   # coerce character "NA" to NA
-#   mutate(CA_DrinkingWater_SvcArea_Name = ifelse(
-#     CA_DrinkingWater_SvcArea_Name == "NA", 
-#     NA, CA_DrinkingWater_SvcArea_Name)) 
 
 wsa_key <- get_wsa_key(pson, son)
 
@@ -244,165 +169,19 @@ pson <- left_join(pson, wsa_key) %>%
   mutate(CA_DrinkingWater_SvcArea_Within = 
            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
-# pson <- pson %>%
-#  mutate(CA_DrinkingWater_SvcArea_Name =
-#           ifelse(Jurisdiction == 'Sonoma', "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
-#          CA_DrinkingWater_SvcArea_Within =
-#           ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
-
-# get edited list of APN's of city of sonoma parcels provided by 0. hart on 10/20/2022
-# this would keep only parcels with manually edited parcels in db
-# p <- path(data_path, "son/public_water_connection/city_of_sonoma/city_son_modified_values/city_son_mod.shp")
-# son_connect <- st_read(p) %>%
-#   filter(Connected =='Yes') %>%
-#   select(APN)
-
-# # get edited list of APN's of city of sonoma parcels provided by 0. hart on 10/20/2022
-# p <- path(data_path, "son/public_water_connection/city_of_sonoma/city_son_modified_values/city_son_mod.shp")
-# son_connect <- st_read(p) %>%
-#   select(APN)
-# 
-# 
-# pson <- pson %>%
-#   mutate(
-#     CA_DrinkingWater_SvcArea_Within =
-#       ifelse(APN %in% son_connect$APN, "Yes", CA_DrinkingWater_SvcArea_Within),
-#     CA_DrinkingWater_SvcArea_Name =
-#       ifelse(APN %in% son_connect$APN, "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
-#   )
-
-# get centroid of city of sonoma parcels provided by 0. hart on 10/20/2022
-# find parcels that overlie these parcels, and then set them as city of sonom water connecetd parcels
-# # COS data is not usable as was provided because APN values were randomly switched.
-# p <- path(data_path, "son/public_water_connection/city_of_sonoma/City_son_connects.shp")
-# son_connect <- st_read(p) %>%
-#   st_transform(epsg)  %>%
-#   st_centroid() %>% 
-#   select(APNDash)
-# 
-# son_connect <- st_join(son_connect, pson)%>% 
-#     st_drop_geometry() %>% 
-#     select(APN)
-# 
-# pson <- pson %>%
-#   mutate(
-#     CA_DrinkingWater_SvcArea_Within =
-#       ifelse(APN %in% son_connect$APN, "Yes", CA_DrinkingWater_SvcArea_Within),
-#     CA_DrinkingWater_SvcArea_Name =
-#       ifelse(APN %in% son_connect$APN, "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
-#   )
 
 f_verify_non_duplicates()
 
-# # add explicit connection data from City of Sonoma
-# path_sonoma_city <- path(data_path, 
-#     "son/public_water_connection/city_of_sonoma/Sonoma_City_connections_10202022.dbf")
-# 
-# connections_sonoma_city <- st_read(path_sonoma_city ) %>%
-#   select(APNDash) 
-# 
-# pson <- pson %>%
-#   mutate(
-#     CA_DrinkingWater_SvcArea_Within =
-#       ifelse(APN %in% connections_sonoma_city$APNDash, "Yes", CA_DrinkingWater_SvcArea_Within),
-#     CA_DrinkingWater_SvcArea_Name =
-#       ifelse(APN %in% connections_sonoma_city$APNDash, "SONOMA, CITY OF", CA_DrinkingWater_SvcArea_Name),
-#   )
-
-
-
-# add explicit connection data from VOMWD
-# path_vomwd <- path(
-#   data_path, "son/public_water_connection/VOMWD Data August 2021",
-#   "Master Location & Backflow data.xlsx")
-# 
-# connections_vomwd <- xlsx::read.xlsx(path_vomwd, 
-#                                            sheetIndex = 1, 
-#                                            colIndex = 4) %>% 
-#   select(APN = `Parcel.Number`) %>% 
-#   # remove a few bogus APNs
-#   filter(nchar(APN) == 11)
-
-# add explicit connection data from Petaluma, Sebastapol, Sonoma, Penngrove,
-# and Valley of the Moon WD - from Shelly on 2022-01-04, Email Subject:
-# Data Revision/Addition | Permit Sonoma GIS: GSA Water Service Connection | ID APN-to-Address
-# shelly_path <- path(data_path, "general", "address_apn.gdb")
-# cat("Reading in explicit connection data for:\n", 
-#     paste(rgdal::ogrListLayers(shelly_path), collapse = "\n "))
-# 
-# 
-# 
-# connections_shelly <- rgdal::ogrListLayers(shelly_path) %>% 
-#   purrr::map_df(
-#     ~rgdal::readOGR(dsn = shelly_path, layer = .x) %>% 
-#       st_as_sf() %>% 
-#       select(APN))
-# 
-# # if an explicit connection is present from any of the sources above
-# # ensure it is represented
-# pson <- pson %>% 
-#   mutate(
-#     Public_Water_Connection = 
-#       ifelse(APN %in% connections_shelly$APN, "Yes", "No"),
-#     Public_Water_Connection_Modified = NA,
-#     Water_Source_Comment = NA
-#     )
-
-# if there's not explicit connection data (which come from big systems 
-# recorded below), and the system is small and within a water service
-# boundary, then assume a connection is present, because we're unlikely
-# to obtain data from these small systems. exclude city of sonoma becase
-# they have incompelte data
-# systems_explicit_data <- c("VALLEY OF THE MOON WATER DISTRICT")
-# 
-# pson <- pson %>% 
-#   mutate(
-#     Public_Water_Connection = ifelse(
-#       ! CA_DrinkingWater_SvcArea_Name %in% systems_explicit_data & 
-#         !is.na(CA_DrinkingWater_SvcArea_Name),
-#       "Yes",
-#       Public_Water_Connection
-#     )
-#   )
 
 pson <-add_public_water_connection(pson)
 
 nmissing<-check_use_codes(pson,nmissing)
 
 
-# ensure public water connection is listed for specified Accessor Use Codes
-#accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
-#                          "Water  Use from Assessor Land Use Code 8_27_2021.xlsx")
-# accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
-#                           "Final 2022 Water  Use from Assessor Land Use Code.xlsx")
-# pwc_accessor_key <- readxl::read_xlsx(accessor_key_path, 
-#                                       sheet = 3, range = "B2:C28") %>% 
-#   janitor::clean_names() %>% 
-#   mutate(use_code = str_pad(use_code, 4, "left", "0"))
-# 
-# # if the parcel is within a water service area and the use code is listed, 
-# # mark a public water service connection even if not explicitly listed
-# pson <- pson %>% 
-#   mutate(Public_Water_Connection = ifelse(
-#     CA_DrinkingWater_SvcArea_Within == "Yes" & 
-#       UseCode %in% pwc_accessor_key$use_code,
-#     "Yes", Public_Water_Connection
-#   )
-  # )
 pson <-pwc_use_code_fix(pson)
 
 nmissing<-check_use_codes(pson,nmissing)
 
-# # add public water connections for modified APNs:
-# apn_add_pwc <- path(data_path, "general/modified_apns.xlsx") %>% 
-#   readxl::read_xlsx(sheet = 1) %>% 
-#   pull(APN)
-# 
-# pson <- pson %>% 
-#   mutate(Public_Water_Connection = ifelse(
-#     APN %in% apn_add_pwc,
-#     "Yes", Public_Water_Connection)
-#   )
 
 f_progress()
 f_verify_non_duplicates()
@@ -462,16 +241,7 @@ f_verify_non_duplicates()
 # used for irrigation purposes... it is assumed that Urban Residential Groundwater 
 # Users extract on average 0.1 AF per parcel per year for irrigation purposes.
 
-# res_rate_urban <- 0.1 # acre feet/year for urban parcels with a well
-# 
-# pson <- pson %>% 
-#   mutate(
-#     # case 1: urban residential: within water system with onsite well
-#     Res_GW_Use_Prelim_Ac_Ft = 
-#       ifelse(Public_Water_Connection == "Yes" & 
-#                Onsite_Well         == "Yes", 
-#              res_rate_urban, NA)
-#   )
+
 
 # Res_W_Use_Assessor_Ac_Ft = Water use rate based off assessor use code
 # Dependency provided by Rob P on 2021-11-16
@@ -557,145 +327,12 @@ f_verify_non_duplicates()
 
 # schools and golf courses ------------------------------------------------
 
-# Reference ET0 in feet, via CIMIS ET0 zone 8: 
-# https://cimis.water.ca.gov/App_Themes/images/etozonemap.jpg
-# et <- 4.1 
-
 # Calculate applied water at schools from ET assuming 
 # application efficiency = 0.65 (65%) from Sandoval, 2010. 
 # http://watermanagement.ucdavis.edu/research/application-efficiency/
-# aw <- et / (1 - 0.65) # feet
-aw <- 3.5 # feet/yr from Andy Rich
+pson <- calculate_lawn(pson, son)
 
-lawn <- path(data_path, "general/crops/i15_LandUse_Sonoma2012_SHP/i15_LandUse_Sonoma2012.shp") %>% 
-  st_read() %>% 
-  filter(CLASS1 == "UL") %>% #filter to only Urban Landscape
-  filter(SUBCLASS1 != "5") %>%  # urban landscape except class 5, which is non-irrigated
-  filter(WATERSOURC != "1") %>%  # watersource 1 is surface water
-  filter(WATERSOURC != "5") %>%  # watersource 5 is reclaimed
-  filter(WATERSOURC != "6")  %>%  # watersource 6 is recycled
-  st_transform(epsg) %>%
-  st_make_valid() %>%
-  st_intersection(son) %>%
-  select(crop_class = CLASS1)
-
-
-# get lawn area per APN and recalculate area, and as before, because there many
-# APN with > 1 crop, we need to summarize the data before joining!
-lawn_per_apn <- st_intersection(select(pson, APN), lawn) %>% 
-  mutate(crop_acres = 
-           as.numeric(units::set_units(st_area(geometry), "acres"))) %>% 
-  # very important! Duplicates are present, and de-duplication is needed
-  distinct() %>% 
-  st_drop_geometry() %>% 
-  # also incredibly important: there are multiple crop polygons per APN 
-  # that need to be summed!
-  group_by(APN, crop_class) %>% 
-  summarise(lawn_acres = sum(crop_acres, na.rm = TRUE)) %>% 
-  ungroup()  %>%
-  select(-crop_class)
-
-
-pson<- left_join(pson, lawn_per_apn) %>%
-  mutate(lawn_acres = ifelse(is.na(lawn_acres), 0, lawn_acres))
-
-#if no public connection, remove lawns <0.2 acres
-pson<- pson %>%
-  mutate(lawn_acres = ifelse(Public_Water_Connection == 'No' & lawn_acres<0.2,
-                             0, lawn_acres))
-
-#if there is public connection, remove lawns <0.5 acres
-pson<- pson %>%
-  mutate(lawn_acres = ifelse(Public_Water_Connection == 'Yes' & lawn_acres<0.5,
-                             0, lawn_acres))
-
-# School_Golf_GW_Use_prelim_Ac_Ft 
-pson <- pson %>% 
-  mutate(School_Golf_GW_Use_Prelim_Ac_Ft = 
-           aw*lawn_acres)   %>%
-  select(-lawn_acres)
-
-
-# # following meeting with Marcus, Rob, and Andy: schools with
-# # a public water connection are assumed to NOT draw from groundwater
-# School_Golf_GW_Use_Prelim_Ac_Ft = 
-#   ifelse(str_detect(tolower(UseCode_Description), "school") &
-#            Public_Water_Connection == "Yes",
-#          0, School_Golf_GW_Use_Prelim_Ac_Ft),
-# # following meeting with Marcus, Rob, and Andy: golf courses with
-# # NO onsite well(s) are assumed to NOT draw from groundwater
-# School_Golf_GW_Use_Prelim_Ac_Ft = 
-#   ifelse(str_detect(tolower(UseCode_Description), "golf|country club") &
-#            Onsite_Well == "No",
-#          0, School_Golf_GW_Use_Prelim_Ac_Ft)
-
-# Code to use to incorporate surface water/recycled water uses.
-# calculate groundwater School_Golf_GW_Use_Prelim_Ac_Ft water use
-pson <- pson %>%
-  mutate(
-    # first ensure that NA values in water budget components go to 0
-    School_Golf_GW_Use_Prelim_Ac_Ft  = ifelse(
-      is.na(School_Golf_GW_Use_Prelim_Ac_Ft), 0, School_Golf_GW_Use_Prelim_Ac_Ft),
-    Surface_Water_Use_Ac_Ft  = ifelse(
-      is.na(Surface_Water_Use_Ac_Ft), 0, Surface_Water_Use_Ac_Ft),
-    Recycled_Water_Use_Ac_Ft = ifelse(
-      is.na(Recycled_Water_Use_Ac_Ft), 0, Recycled_Water_Use_Ac_Ft),
-    #calculate School_Golf_Surface_Recycled_Use_Ac_Ft
-    School_Golf_Surface_Recycled_Use_Ac_Ft = Surface_Water_Use_Ac_Ft + Recycled_Water_Use_Ac_Ft,
-    #calculate school_golf_gw_demand in order to limit surface/recycled water actual use
-    school_golf_gw_demand = School_Golf_GW_Use_Prelim_Ac_Ft,
-    # Ag School_Golf_GW_Use_Prelim_Ac_Ft use is the following mass balance:
-    School_Golf_GW_Use_Prelim_Ac_Ft =
-      School_Golf_GW_Use_Prelim_Ac_Ft -
-      (Surface_Water_Use_Ac_Ft + Recycled_Water_Use_Ac_Ft),
-    )
-
-# if a parcel receives more water from surface and recycled sources
-# than estimated demand, the calculated groundwater use is negative, so
-# we coerce this to zero
-pson <- pson %>%
-  mutate(School_Golf_GW_Use_Prelim_Ac_Ft = ifelse(
-    School_Golf_GW_Use_Prelim_Ac_Ft < 0, 0, School_Golf_GW_Use_Prelim_Ac_Ft))
-
-# if a parcel receives more water from surface and recycled sources
-# than estimated demand, then set the
-# total School_Golf_Surface_Recycled_Use_Ac_Ft = School_Golf_GW_Use_Prelim_Ac_Ft
-pson <- pson %>%
-  mutate(School_Golf_Surface_Recycled_Use_Ac_Ft = ifelse(
-    School_Golf_Surface_Recycled_Use_Ac_Ft > school_golf_gw_demand,
-    school_golf_gw_demand, School_Golf_Surface_Recycled_Use_Ac_Ft)) %>%
-  select(-school_golf_gw_demand)
-
-
-# # school locations
-# # school_codes <- filter(pson, str_detect(UseCode_Description, "SCHOOL")) %>% mapview()
-# 
-# # School_Golf_GW_Use_prelim_Ac_Ft 
-# pson <- pson %>% 
-#   mutate(School_Golf_GW_Use_Prelim_Ac_Ft = 
-#            ifelse(str_detect(tolower(UseCode_Description), 
-#                              "school|golf|country club"),
-#                   aw*LandSizeAcres*0.5, 0),
-#          # following meeting with Marcus, Rob, and Andy: schools with
-#          # a public water connection are assumed to NOT draw from groundwater
-#          School_Golf_GW_Use_Prelim_Ac_Ft = 
-#            ifelse(str_detect(tolower(UseCode_Description), "school") &
-#                     Public_Water_Connection == "Yes",
-#                   0, School_Golf_GW_Use_Prelim_Ac_Ft),
-#          # following meeting with Marcus, Rob, and Andy: golf courses with
-#          # NO onsite well(s) are assumed to NOT draw from groundwater
-#          School_Golf_GW_Use_Prelim_Ac_Ft = 
-#            ifelse(str_detect(tolower(UseCode_Description), "golf|country club") &
-#                     Onsite_Well == "No",
-#                   0, School_Golf_GW_Use_Prelim_Ac_Ft)
-#   ) 
-#   
-# blank fields to permit revision of the data
-pson <- pson %>% 
-  mutate(
-         School_Golf_GW_Use_Ac_Ft = ifelse(School_Golf_Modified == "Yes", 
-                                           School_Golf_GW_Use_Modified_Ac_Ft, 
-                                           School_Golf_GW_Use_Prelim_Ac_Ft)) 
+pson <- school_golf_calc(pson)
 
 f_progress()
 f_verify_non_duplicates()
@@ -703,183 +340,26 @@ f_verify_non_duplicates()
 
 # crop water use ----------------------------------------------------------
 # Raftelis report document pgs 25-27
+pson <-add_cannabis_modified(pson)
 
-# crop data - intersect to son. For reference, crop classes:
-### C = Citrus and subtropical
-### D = Deciduous Fruits and Nuts
-### G = Grain
-### P = Pasture
-### T = Truck Nursery and Berry Crops
-### V = Vineyard
-### X = other
-crop <- path(data_path, "general/crops/i15_Crop_Mapping_2018.shp") %>% 
-  st_read() %>% 
-  filter(COUNTY == "Sonoma") %>% 
-  st_transform(epsg) %>% 
-  st_make_valid() %>% 
-  st_intersection(son) %>% 
-  select(crop_class = CLASS2) %>% 
-  mutate(crop_class = case_when(
-    crop_class == "C" ~ "Citrus_and_Subtropical",
-    crop_class == "D" ~ "Deciduous_Fruit_and_Nuts",
-    crop_class == "T" ~ "Truck_and_Berry_Crops",
-    crop_class == "V" ~ "Vine",
-    crop_class == "G" ~ "Grain",
-    crop_class == "P" ~ "Pasture",
-    TRUE ~ "X"
-  ))
+crop <-load_land_use(pson)
+pson <-calc_crop_water_use(pson, crop)
 
-# get crops per APN and recalculate area, and as before, because there many
-# APN with > 1 crop, we need to summarize the data before joining!
-crops_per_apn <- st_intersection(select(pson, APN), crop) %>% 
-  mutate(crop_acres = 
-           as.numeric(units::set_units(st_area(geometry), "acres"))) %>% 
-  # very important! Duplicates are present, and de-duplication is needed
-  distinct() %>% 
-  st_drop_geometry() %>% 
-  # also incredibly important: there are multiple crop polygons per APN 
-  # that need to be summed!
-  group_by(APN, crop_class) %>% 
-  summarise(crop_acres = sum(crop_acres, na.rm = TRUE)) %>% 
-  ungroup()
 
-# applied water (in acre feet per acre) per crop, for references, see Rob
-# Pennington's Sheet path(data_path, "general/crop_water_use/Crop Type Vs Water Use v3.xlsx")
-# and email 2022-01-10 Re: Ongoing technical question log
-crop_applied_water <- tibble(
-  crop_class = c("Citrus_and_Subtropical", "Deciduous_Fruit_and_Nuts", 
-                 "Truck_and_Berry_Crops", "Vine", "Grain", "Pasture", "X"),
-  applied_af_acre = c(1.85, 1.83, 1.78, 0.6, 0, 0.04, 0))
-
-# add applied water and calculate acre feet used per parcel, but because there
-# are multiple crops per field, we need to make sure the output dataframe has
-# only one row per APN, and is in wide format ready for the join to `pson`
-crops_per_apn_key <- left_join(crops_per_apn, crop_applied_water) %>% 
-  mutate(applied_af = crop_acres * applied_af_acre) %>% 
-  select(-applied_af_acre) %>% 
-  pivot_wider(names_from = crop_class, values_from = c(crop_acres, applied_af))
-
-# fix names
-cns <- names(crops_per_apn_key)
-cns[str_which(cns, "crop_acres")] <- paste0(
-  str_replace_all(
-    cns[str_which(cns, "crop_acres")], "crop_acres_", ""), 
-  "_Area_Ac")
-cns[str_which(cns, "applied_af")] <- paste0(
-  str_replace_all(
-    cns[str_which(cns, "applied_af")], "applied_af_", ""), 
-  "_Rate")
-names(crops_per_apn_key) <- cns
-
-# NA values for crop water use go to zero
-crops_per_apn_key[is.na(crops_per_apn_key)] <- 0
-
-# join crops to parcels in the specified format and calculate consumptive rate
-pson <- pson %>% 
-  left_join(crops_per_apn_key) %>% 
-  mutate(
-    # crop area per parcel
-    Cannabis_Outdoor_Area_Ac         = 0, # no cannabis data
-    Cannabis_Indoor_Area_Ac          = 0, # no cannabis data
-    
-    # crop consumptive use (AF/year)
-    Cannabis_Outdoor_Rate            = 0, 
-    Cannabis_Indoor_Rate             = 0, 
-    
-    # summation columns
-    Total_Crop_Area_Prelim_Ac = rowSums(across(ends_with("Area_Ac")), 
-                                        na.rm = TRUE),
-    Total_Crop_Area_Ac        = Total_Crop_Area_Prelim_Ac, 
-    Water_Use_Ag_Rate_Ac_Ft   = rowSums(across(ends_with("_Rate")), 
-                                        na.rm = TRUE)
-  ) %>% 
-  # replace NA areas and rates with 0
-  mutate(across(ends_with("_Area_Ac"), ~ifelse(is.na(.x), 0, .x)),
-         across(ends_with("_Rate"), ~ifelse(is.na(.x), 0, .x)))
 
 f_verify_non_duplicates()
 
 # calculate groundwater ag water use
-pson <- pson %>% 
-  mutate(
-    # first ensure that NA values in water budget components go to 0
-    Water_Use_Ag_Rate_Ac_Ft  = ifelse(
-      is.na(Water_Use_Ag_Rate_Ac_Ft), 0, Water_Use_Ag_Rate_Ac_Ft),
-    Surface_Water_Use_Ac_Ft  = ifelse(
-      is.na(Surface_Water_Use_Ac_Ft), 0, Surface_Water_Use_Ac_Ft),
-    Recycled_Water_Use_Ac_Ft = ifelse(
-      is.na(Recycled_Water_Use_Ac_Ft), 0, Recycled_Water_Use_Ac_Ft),
-    #calculate Ag_Surface_Recycled_Actual_Use_Ac_Ft
-    Ag_Surface_Recycled_Actual_Use_Ac_Ft = Surface_Water_Use_Ac_Ft + Recycled_Water_Use_Ac_Ft,
-    # Ag GW use is the following mass balance:
-    Ag_GW_Use_GIS_Ac_Ft = 
-      Water_Use_Ag_Rate_Ac_Ft - 
-      (Surface_Water_Use_Ac_Ft + Recycled_Water_Use_Ac_Ft))
+pson <- calc_ag_use(pson)
 
-# if a parcel receives more water from surface and recycled sources 
-# than estimated demand, the calculated groundwater use is negative, so
-# we coerce this to zero
-pson <- pson %>% 
-  mutate(Ag_GW_Use_GIS_Ac_Ft = ifelse(
-    Ag_GW_Use_GIS_Ac_Ft < 0, 0, Ag_GW_Use_GIS_Ac_Ft))
-
-# if a parcel receives more water from surface and recycled sources
-# than estimated demand, then set the
-# total Ag_Surface_Recycled_Actual_Use_Ac_Ft = Ag_GW_Use_GIS_Ac_Ft
-pson <- pson %>%
-  mutate(Ag_Surface_Recycled_Actual_Use_Ac_Ft = ifelse(
-    Ag_Surface_Recycled_Actual_Use_Ac_Ft > Water_Use_Ag_Rate_Ac_Ft,
-    Water_Use_Ag_Rate_Ac_Ft, Ag_Surface_Recycled_Actual_Use_Ac_Ft))
-
-# No Idle Acres to start - this is reported
-pson <- pson %>% mutate(Idle_Ac = 0)
-
-
-
-# blank fields to permit revision of the data
-pson <- pson %>% 
-  mutate(
-         Ag_GW_Use_Ac_Ft = ifelse(Ag_GW_Use_Modified == "Yes", 
-                                  Ag_GW_Use_Modified_Ac_Ft, 
-                                  Ag_GW_Use_GIS_Ac_Ft)) 
 
 f_progress()
 f_verify_non_duplicates()
 
 
 # determination for GIS survey --------------------------------------------
+pson <- gis_survey_determination(pson)
 
-pson <- pson %>% 
-  mutate(
-    Residential_Water_Use_Determination = ifelse(
-      Res_W_Use_Assessor_Ac_Ft > 0 | 
-        Res_GW_Use_Prelim_Ac_Ft > 0 | 
-        Res_GW_Use_Modified_Ac_Ft > 0, "Yes", "No"
-    ),
-    Commercial_Water_Use_Determination = ifelse(
-      Commercial_W_Use_Assessor_Ac_Ft > 0 | 
-        Commercial_GW_Use_Prelim_Ac_Ft > 0 | 
-        Commercial_GW_Use_Modified_Ac_Ft > 0, "Yes", "No"
-    ),
-    Urban_Landscape_Irrigation_Water_Use_Determination = ifelse(
-      Urban_Irrigation_GW_Use_Ac_Ft > 0, "Yes", "No"
-    ),
-    Ag_Irrigation_Water_Use_Determination = ifelse(
-      Water_Use_Ag_Rate_Ac_Ft  > 0, "Yes", "No"
-    ),
-    Recycled_Water_Use_Determination = ifelse(
-      Recycled_Water_Use_Ac_Ft > 0, "Yes", "No"
-    ),
-    Surface_Water_Use_Determination = ifelse(
-      Surface_Water_Use_Ac_Ft > 0, "Yes", "No"
-    ),
-    School_GolfCourse_Water_Use_Determination = ifelse(
-      School_Golf_GW_Use_Ac_Ft > 0, "Yes", "No"
-    )
-  ) %>% 
-  # make all NAs in these columns go to zero
-  mutate(across(ends_with("Determination"), ~ifelse(is.na(.x), "No", .x)))
-  
 nmissing<-check_use_codes(pson)
 f_progress()
 f_verify_non_duplicates()
@@ -887,42 +367,14 @@ f_verify_non_duplicates()
     
 # total calculations ------------------------------------------------------
 
-# ensure NA values go to 0 so the result is calculable
-pson <- pson %>% 
-  mutate(across(ends_with("GW_Use_Ac_Ft"), ~ifelse(is.na(.x), 0, .x))) 
+psrp <- total_use_calc(pson, gw_use_rate)
+# # ensure NA values go to 0 so the result is calculable
 
-# calculate total groundwater use
-pson <- pson %>% 
-  mutate(
-    Total_Groundwater_Use_Ac_Ft =
-      Res_GW_Use_Ac_Ft + 
-      Commercial_GW_Use_Ac_Ft + 
-      Ag_GW_Use_Ac_Ft + 
-      School_Golf_GW_Use_Ac_Ft + 
-      Urban_Irrigation_GW_Use_Ac_Ft,
-    Total_Groundwater_Use_PublicView = NA,
-  )
-
-# set to zero parcels with less than 0.1 AF
-pson <- mutate(pson,Total_Groundwater_Use_Ac_Ft = 
-                 ifelse(Total_Groundwater_Use_Ac_Ft<0.1, 0,
-                        Total_Groundwater_Use_Ac_Ft),
-               Parcel_fee = Total_Groundwater_Use_Ac_Ft*unsub_gw_sub_rate,
-               Fee_Rate = gw_use_rate,
-               Parcel_Fee_Subsidized = Total_Groundwater_Use_Ac_Ft*gw_use_rate
-               )
-
-# additional columns
-
-# Jurisdiction 
-# Situs_Address 
 
 
 # final manual tests ------------------------------------------------------
 nmissing<-check_use_codes(pson)
 
-# drop no longer needed UseCode column
-#pson <- select(pson, -UseCode)
 
 # sanity check: cols that still need to be added
 add[!add %in% colnames(pson)]
