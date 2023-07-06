@@ -20,10 +20,11 @@ DATA_PATH = "<local path to Dropbox data>"
 EPSG = 3310
 ```
 
-The `DATA_PATH` is where project data dependencies are stored on a synced Dropbox folder. On my computer it's `~/Dropbox (LWA)/data/sonoma_co_gsas_rate_fee`, so my environmental variable is: `DATA_PATH = "~/Dropbox (LWA)/data/sonoma_co_gsas_rate_fee"`. In reality, this can be anywhere, including an external drive for very large data.  
+The `DATA_PATH` is where project data dependencies are stored on a synced Dropbox folder. On my computer it's `T:/arich/data/sonoma_co_gsas_rate_fee`, so my environmental variable is: `DATA_PATH = "T:/arich/data/sonoma_co_gsas_rate_fee"`. In reality, this can be anywhere, including an external drive for very large data.  
 
-Use the following link to obtain Dropbox Data Dependencies used by the code: ~~https://www.dropbox.com/sh/5lyd9r01zh62s7w/AABcQphVCHx41e-T5vTczu7va?dl=0~~
-https://www.dropbox.com/sh/bku6o6o98k0gy1x/AACzaT7kFYFUcpqUb0XFNvhza?dl=0
+Download the data from the Web Portal, using the following folder: 
+sonoma_co_gsas_rate_fee
+
 
 
 The `EPSG` is the projection used in this study that all spatial data are standardized to.  
@@ -41,6 +42,14 @@ bash run.sh
 ```
 
 `run.sh` strings together the sequential steps that create the database. Inspect it to see the 4 scripts it calls in order.  
+
+## To update the Surface Water
+
+To update Surface Water, place new annual reports into corresponding folder. then Run:
+```
+cd gfs/code
+bash run_ewrims.sh
+```
 
 
 ## Schema
