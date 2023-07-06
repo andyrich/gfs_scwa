@@ -50,15 +50,15 @@ load_all_modified <- function(){
                           'Res_GW_Use_Comment'),
     School_Golf_Modified=c('School_Golf_GW_Use_Modified_Ac_Ft',
                            'School_Golf_GW_Use_Comment'),
-    # Urban_Well_Modified=c('Urban_Well_Modified_Ac_Ft',
-    #                             'Urban_Well_Comment' ),
-    # 
-    # Surface_Water_Connection_Modified=c('Surface_Water_Connection_Modified',
-    #                             'Surface_Water_Connection_Comment' ),
-    # Surface_Water_Use_Modified=c('Surface_Water_Use_Modified_Ac_Ft',
-    #                             'Surface_Water_Use_Comment' ),
-    # Recycled_Water_Use_Modified=c('Recycled_Water_Use_Modified_Ac_Ft',
-    #                             'Recycled_Water_Use_Comment' )
+    Urban_Well_Modified=c('Urban_Well_Modified_Ac_Ft',
+                                'Urban_Well_Comment' ),
+
+    Surface_Water_Connection_Modified=c('Surface_Water_Connection_Modified',
+                                'Surface_Water_Connection_Comment' ),
+    Surface_Water_Use_Modified=c('Surface_Water_Use_Modified_Ac_Ft',
+                                'Surface_Water_Use_Comment' ),
+    Recycled_Water_Use_Modified=c('Recycled_Water_Use_Modified_Ac_Ft',
+                                'Recycled_Water_Use_Comment' )
 
     )
   
@@ -66,10 +66,10 @@ load_all_modified <- function(){
   df2 = load_modified_single(names(h[2]),h[2][1], h[2][2])
   df3 = load_modified_single(names(h[3]),h[3][1], h[3][2])
   df4 = load_modified_single(names(h[4]),h[4][1], h[4][2])
-  # df5 = load_modified_single(names(h[5]),h[5][1], h[5][2])
-  # df6 = load_modified_single(names(h[6]),h[6][1], h[6][2])
-  # df7 = load_modified_single(names(h[7]),h[7][1], h[7][2])
-  # df8 = load_modified_single(names(h[8]),h[8][1], h[8][2])
+  df5 = load_modified_single(names(h[5]),h[5][1], h[5][2])
+  df6 = load_modified_single(names(h[6]),h[6][1], h[6][2])
+  df7 = load_modified_single(names(h[7]),h[7][1], h[7][2])
+  df8 = load_modified_single(names(h[8]),h[8][1], h[8][2])
   
   df = list(df1, df2, df3, df4)
   # df = list(df1, df2, df3, df4, df5,  df6, df7, df8)
