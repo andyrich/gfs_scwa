@@ -367,7 +367,7 @@ f_verify_non_duplicates()
     
 # total calculations ------------------------------------------------------
 
-psrp <- total_use_calc(pson, gw_use_rate)
+pson <- total_use_calc(pson, gw_use_rate)
 # # ensure NA values go to 0 so the result is calculable
 
 
