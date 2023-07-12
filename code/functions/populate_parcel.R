@@ -65,7 +65,7 @@ load_land_use <- function(parcel){
 ### X = other
 print('adding crop data to crop table')
 crop <- path(data_path, 
-"general/crops/i15_crop_mapping_2020/i15_Crop_Mapping_2020/i15_Crop_Mapping_2020_SON.shp" 
+"general/crops/i15_crop_mapping_2020/i15_crop_mapping_2020_edit/i15_Crop_Mapping_2020_SON_Edit.shp" 
              ) %>% 
   st_read() %>% 
   filter(COUNTY == "Sonoma") %>% 

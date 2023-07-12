@@ -16,6 +16,8 @@ epsg <- as.numeric(Sys.getenv("EPSG"))
 # area of interest object to make helper functions work
 aoi = "psrp"
 
+# remove the test values from the modified tables:
+remove_test <- FALSE
 
 # delete complete DBs
 gjson_out <- path(data_path, "data_output/srp_parcel_complete.rds")
@@ -33,9 +35,9 @@ accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
 
 
 # preprocessed spatial parcels from Sonoma Co parcels
-pson <- read_rds(path(data_path, "data_output/son_parcel.rds"))
-ppet <- read_rds(path(data_path, "data_output/pet_parcel.rds"))
-psrp <- read_rds(path(data_path, "data_output/srp_parcel.rds"))
+# pson <- read_rds(path(data_path, "data_output/son_parcel.rds"))
+# ppet <- read_rds(path(data_path, "data_output/pet_parcel.rds"))
+parcel <- read_rds(path(data_path, "data_output/srp_parcel.rds"))
 cat("Loaded preprocedded spatial parcels from Sonoma County.\n")
 
 
@@ -46,17 +48,17 @@ fields <- c(fields, "UseCode", 'edge') # add use code and drop it later
 b118_path <- path(data_path, "general/b118/i08_B118_v6-1.shp") 
 
 # gsa spatial data: petaluma, sonoma valley, santa rosa plain
-son <- f_load_b118_basin(b118_path, "NAPA-SONOMA VALLEY - SONOMA VALLEY")
-pet <- f_load_b118_basin(b118_path, "PETALUMA VALLEY")
+# son <- f_load_b118_basin(b118_path, "NAPA-SONOMA VALLEY - SONOMA VALLEY")
+# pet <- f_load_b118_basin(b118_path, "PETALUMA VALLEY")
 srp <- f_load_b118_basin(b118_path, "SANTA ROSA VALLEY - SANTA ROSA PLAIN")
 cat("Loaded B118 spatial boundaries per region.\n")
 
 
 # fields to keep, add, remove ---------------------------------------------
 
-done <- fields[fields %in% colnames(psrp)]  # cols already there
-add  <- fields[!fields %in% colnames(psrp)] # cols to add
-rem  <- colnames(psrp)[!colnames(psrp) %in% fields] # cols to remove
+done <- fields[fields %in% colnames(parcel)]  # cols already there
+add  <- fields[!fields %in% colnames(parcel)] # cols to add
+rem  <- colnames(parcel)[!colnames(parcel) %in% fields] # cols to remove
 rem  <- rem[-length(rem)] # don't remove the geometry column
 
 
@@ -64,17 +66,17 @@ rem  <- rem[-length(rem)] # don't remove the geometry column
 
 
 # parcel and contact info -------------------------------------------------
-psrp <-parcel_contact(psrp)
+parcel <-parcel_contact(parcel)
 
 f_progress()
 
 
 # remove fields that should not be in the final database
-psrp <- psrp %>% select(-all_of(rem))
+parcel <- parcel %>% select(-all_of(rem))
 cat("Removed", length(rem), "fields from parcel database.\n   ",
     paste(rem, collapse = "\n    "))
 
-nmissing<-check_use_codes(psrp)
+nmissing<-check_use_codes(parcel)
 
 
 
@@ -94,16 +96,16 @@ nmissing<-check_use_codes(psrp)
 # # parcels that intersect multiple basins have duplicate APN across databases
 # boundary_parcels <- psrp$APN[psrp$APN %in% ppet$APN]
 
-psrp <- fill_parcel_info(psrp, 'Santa Rosa Plain')
+parcel <- fill_parcel_info(parcel, 'Santa Rosa Plain')
 
 
 # overwrite all of the above work, have default be that basin is Santa Rosa Plain Will
 # be recalculated at combine_db
-psrp <- psrp %>% 
+parcel <- parcel %>% 
   mutate(GSA_Jurisdiction_Prelim = "Santa Rosa Plain",
          Basin_Boundary_Parcel = edge)%>% select(-edge)
 
-nmissing<-check_use_codes(psrp,nmissing)
+nmissing<-check_use_codes(parcel,nmissing)
 
 f_progress()
 
@@ -119,7 +121,7 @@ f_progress()
 ## recycled water ---------------------------------------------------------
 # load delivery data from recycled water treatment plants
 
-psrp$Recycled_Water_Use_Ac_Ft <- NULL
+parcel$Recycled_Water_Use_Ac_Ft <- NULL
 
 
 ## recycled water ---------------------------------------------------------
@@ -135,30 +137,30 @@ recy <- path(data_path,
   select(-parcel)
 
 # add recycled water parcels to parcel data
-psrp <- left_join(psrp, recy, by = "APN") %>%
+parcel <- left_join(parcel, recy, by = "APN") %>%
   mutate(Recycled_Water_Connection = ifelse(
     !is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No"))
 
 
-nmissing<-check_use_codes(psrp,nmissing)
+nmissing<-check_use_codes(parcel,nmissing)
 
 print('here is the sum of the recycled water before adding modified')
-print(psrp %>%
+print(parcel %>%
           st_drop_geometry() %>%
           select(Recycled_Water_Use_Ac_Ft)  %>%
           colSums(na.rm = TRUE))
 
-psrp <- add_recycled_water_modified(psrp)
+parcel <- add_recycled_water_modified(parcel, remove_test)
 
-psrp <- add_recycled_water_connection_modified(psrp)
+parcel <- add_recycled_water_connection_modified(parcel, remove_test)
 
 print('here is the sum of the recycled water after adding modified')
-print(psrp %>%
+print(parcel %>%
         st_drop_geometry() %>%
         select(Recycled_Water_Use_Ac_Ft)  %>%
         colSums(na.rm = TRUE))
 
-nmissing<-check_use_codes(psrp,nmissing)
+nmissing<-check_use_codes(parcel,nmissing)
 
 f_progress()
 
@@ -174,15 +176,15 @@ ewrims_key <- f_load_surface_water(data_path)
 # #remove columns Surface_Water_Connection and Surface_Water_Use_Ac_Ft
 # psrp <- subset(psrp, select = -c(Surface_Water_Use_Ac_Ft, Surface_Water_Connection))
 
-psrp <- left_join(psrp, ewrims_key) %>%
+parcel <- left_join(parcel, ewrims_key) %>%
   mutate(Surface_Water_Connection = ifelse(
     !is.na(Surface_Water_Use_Ac_Ft) & Surface_Water_Use_Ac_Ft > 0,
     "Yes", "No"))
 
-psrp <- add_surface_water_modified(psrp)
+parcel <- add_surface_water_modified(parcel, remove_test)
 
-psrp <- add_surface_water_connection_modified(psrp)
-nmissing<-check_use_codes(psrp,nmissing)
+parcel <- add_surface_water_connection_modified(parcel, remove_test)
+nmissing<-check_use_codes(parcel,nmissing)
 
 
 f_progress()
@@ -193,21 +195,21 @@ print('done loading surface water data')
 
 # ## wells ------------------------------------------------------------------
 # # Sonoma county wells - deduplicate
-scwells <- add_wells(psrp)
-psrp <-calc_wells(psrp, scwells)
+scwells <- add_wells(parcel)
+parcel <-calc_wells(parcel, scwells)
 
 f_progress()
 f_verify_non_duplicates()
 
-nmissing<-check_use_codes(psrp,nmissing)
+nmissing<-check_use_codes(parcel,nmissing)
 
-psrp <- psrp %>% replace_Onsite_Well_modified() %>%
-  replace_Well_Records_Available_modified() %>%
-  replace_shared_well_APN_modified() %>%
-  replace_shared_well_modified() %>%
-  replace_active_well_modified()
+parcel <- parcel %>% replace_Onsite_Well_modified( remove_test= remove_test) %>%
+  replace_Well_Records_Available_modified(remove_test= remove_test) %>%
+  replace_shared_well_APN_modified(remove_test= remove_test) %>%
+  replace_shared_well_modified(remove_test= remove_test) %>%
+  replace_active_well_modified(remove_test= remove_test)
 
-nmissing<-check_use_codes(psrp,nmissing)
+nmissing<-check_use_codes(parcel,nmissing)
 ## water service areas ----------------------------------------------------
 
 # water service areas in SON
@@ -221,25 +223,25 @@ nmissing<-check_use_codes(psrp,nmissing)
 
 
 
-wsa_key <- get_wsa_key(psrp, srp)
+wsa_key <- get_wsa_key(parcel, srp)
 
-psrp <- left_join(psrp, wsa_key) %>%
+parcel <- left_join(parcel, wsa_key) %>%
   mutate(CA_DrinkingWater_SvcArea_Within =
            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
 f_verify_non_duplicates()
 
-nmissing<-check_use_codes(psrp,nmissing)
+nmissing<-check_use_codes(parcel,nmissing)
 # add explicit connection data from Petaluma, Sebastapol, Sonoma, Penngrove,
 # and Valley of the Moonb WD - from Shelly on 2022-01-04, Email Subject:
 # # if an explicit connection is present, ensure it is represented
 
 
-psrp <-add_public_water_connection(psrp)
-nmissing<-check_use_codes(psrp,nmissing)
+parcel <-add_public_water_connection(parcel)
+nmissing<-check_use_codes(parcel,nmissing)
 
-nmissing<-check_use_codes(psrp,nmissing)
-psrp <-pwc_use_code_fix(psrp)
+nmissing<-check_use_codes(parcel,nmissing)
+parcel <-pwc_use_code_fix(parcel)
 
 
 # add public water connections for modified APNs: 
@@ -285,15 +287,15 @@ res_use_accessor_key <- readxl::read_xlsx(accessor_key_path,
 #                    "Commercial_W_Use_Assessor_Ac_Ft")))
 
 
-psrp <- replace_use_code(psrp)
+parcel <- replace_use_code(parcel, remove_test)
 
-nmissing<-check_use_codes(psrp,nmissing)
+nmissing<-check_use_codes(parcel,nmissing)
 
-psrp <- left_join(psrp, res_use_accessor_key)
+parcel <- left_join(parcel, res_use_accessor_key)
 
 # Res_GW_Use_Prelim_Ac_Ft is Res_W_Use_Assessor_Ac_Ft if
 # there's no public water connection, otherwise, it's 0
-psrp <- psrp %>%
+parcel <- parcel %>%
   mutate(Res_GW_Use_Prelim_Ac_Ft = ifelse(
     Public_Water_Connection == "No", 
     Res_W_Use_Assessor_Ac_Ft,
@@ -301,11 +303,11 @@ psrp <- psrp %>%
   ))
 
 # load modified fields
-psrp <- join_with_modified(psrp)
+parcel <- join_with_modified(parcel, remove_test)
 
 
 # blank fields to permit revision of the data
-psrp <- psrp %>%
+parcel <- parcel %>%
   mutate(
          Res_GW_Use_Ac_Ft = ifelse(Res_GW_Use_Modified == "Yes",
                                    Res_GW_Use_Modified_Ac_Ft,
@@ -314,14 +316,14 @@ psrp <- psrp %>%
 # f_progress()
 # f_verify_non_duplicates()
 
-nmissing<-check_use_codes(psrp,nmissing)
+nmissing<-check_use_codes(parcel,nmissing)
 
 # commercial water use ----------------------------------------------------
 
 
 # Commercial_GW_Use_Prelim_Ac_Ft is Commercial_W_Use_Assessor_Ac_Ft if
 # there's no public water connection, otherwise, it's 0
-psrp <- psrp %>%
+parcel <- parcel %>%
   mutate(Commercial_GW_Use_Prelim_Ac_Ft = ifelse(
     Public_Water_Connection == "No",
     Commercial_W_Use_Assessor_Ac_Ft,
@@ -329,7 +331,7 @@ psrp <- psrp %>%
   ))
  
 # # blank fields to permit revision of the data
-psrp <- psrp %>%
+parcel <- parcel %>%
   mutate(
          Commercial_GW_Use_Ac_Ft          = ifelse(
            Commercial_GW_Use_Modified == "Yes",
@@ -346,21 +348,21 @@ psrp <- psrp %>%
 # dictionary: '(default value is "No")... Parcel sets from GUIDE Survey or 
 # Cities will be used in the future to set to "Yes"'
 
-psrp <- load_urban_wells(data_path, psrp)
-psrp <- replace_urban_well_modified(psrp)
+parcel <- load_urban_wells(data_path, parcel)
+parcel <- replace_urban_well_modified(parcel, remove_test)
 
-psrp <- calc_urban_irrigation(psrp)
-psrp <- add_urban_irrigation_modified(psrp)
+parcel <- calc_urban_irrigation(parcel)
+parcel <- add_urban_irrigation_modified(parcel, remove_test)
 
-nmissing<-check_use_codes(psrp,nmissing)
+nmissing<-check_use_codes(parcel,nmissing)
 
 
 # # schools and golf courses ------------------------------------------------
 
-psrp <- calculate_lawn(psrp, srp)
+parcel <- calculate_lawn(parcel, srp)
 
 
-psrp <- school_golf_calc(psrp)
+parcel <- school_golf_calc(parcel)
 f_progress()
 f_verify_non_duplicates()
 
@@ -368,37 +370,37 @@ f_verify_non_duplicates()
 # crop water use ----------------------------------------------------------
 # Raftelis report document pgs 25-27
 
-psrp <-add_cannabis_modified(psrp)
+parcel <-add_cannabis_modified(parcel, remove_test)
 
-crop <-load_land_use(psrp)
-psrp <-calc_crop_water_use(psrp, crop)
+crop <-load_land_use(parcel)
+parcel <-calc_crop_water_use(parcel, crop)
 
 f_verify_non_duplicates()
 
 
 
 # calculate groundwater ag water use
-psrp <- calc_ag_use(psrp)
+parcel <- calc_ag_use(parcel)
 
 f_progress()
 f_verify_non_duplicates()
 
 
 # determination for GIS survey --------------------------------------------
-psrp <- gis_survey_determination(psrp)
+parcel <- gis_survey_determination(parcel)
 
 f_progress()
 f_verify_non_duplicates()
 
 
 # total calculations ------------------------------------------------------
-psrp <- total_use_calc(psrp, gw_use_rate)
+parcel <- total_use_calc(parcel, gw_use_rate)
 
 
 # final manual tests ------------------------------------------------------
 
 # sanity check: cols that still need to be added
-add[!add %in% colnames(psrp)]
+add[!add %in% colnames(parcel)]
 
 f_progress()
 f_verify_non_duplicates()
@@ -406,7 +408,7 @@ f_verify_non_duplicates()
 
 # write complete parcel data ----------------------------------------------
 
-psrp %>%
+parcel %>%
   write_rds(path(data_path, "data_output/srp_parcel_complete.rds"))
 cat("Complete SRP.\n")
 

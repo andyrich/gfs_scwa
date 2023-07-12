@@ -16,6 +16,9 @@ epsg <- as.numeric(Sys.getenv("EPSG"))
 # area of interest object to make helper functions work
 aoi = "ppet"
 
+# remove the test values from the modified tables:
+remove_test <- FALSE
+
 # delete complete DBs
 print('deleting...')
 gjson_out <- path(data_path, "data_output/pet_parcel_complete.rds")
@@ -32,9 +35,9 @@ accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
 
 
 # preprocessed spatial parcels from Sonoma Co parcels
-pson <- read_rds(path(data_path, "data_output/son_parcel.rds"))
-ppet <- read_rds(path(data_path, "data_output/pet_parcel.rds"))
-psrp <- read_rds(path(data_path, "data_output/srp_parcel.rds"))
+# pson <- read_rds(path(data_path, "data_output/son_parcel.rds"))
+parcel <- read_rds(path(data_path, "data_output/pet_parcel.rds"))
+# psrp <- read_rds(path(data_path, "data_output/srp_parcel.rds"))
 cat("Loaded preprocedded spatial parcels from Sonoma County.\n")
 
 # final fields to use
@@ -53,14 +56,14 @@ cat("Loaded B118 spatial boundaries per region.\n")
 
 # fields to keep, add, remove ---------------------------------------------
 
-done <- fields[fields %in% colnames(ppet)]  # cols already there
-add  <- fields[!fields %in% colnames(ppet)] # cols to add
-rem  <- colnames(ppet)[!colnames(ppet) %in% fields] # cols to remove
+done <- fields[fields %in% colnames(parcel)]  # cols already there
+add  <- fields[!fields %in% colnames(parcel)] # cols to add
+rem  <- colnames(parcel)[!colnames(parcel) %in% fields] # cols to remove
 rem  <- rem[-length(rem)] # don't remove the geometry column
 
 
 # parcel and contact info -------------------------------------------------
-ppet <-parcel_contact(ppet)
+parcel <-parcel_contact(parcel)
 
 
 f_progress()
@@ -72,7 +75,7 @@ f_progress()
 # remove fields -----------------------------------------------------------
 
 # remove fields that should not be in the final database
-ppet <- ppet %>% select(-all_of(rem))
+parcel <- parcel %>% select(-all_of(rem))
 cat("Removed", length(rem), "fields from parcel database.\n   ",
     paste(rem, collapse = "\n    "))
 
@@ -85,9 +88,9 @@ cat("Removed", length(rem), "fields from parcel database.\n   ",
 
 # # parcels that intersect multiple basins have duplicate APN across databases
 
-ppet <- fill_parcel_info(ppet, 'Petaluma Valley')
+parcel <- fill_parcel_info(parcel, 'Petaluma Valley')
 
-check_use_codes(ppet)
+check_use_codes(parcel)
 
 f_progress()
 
@@ -110,14 +113,14 @@ recy <- path(
   select(-Mean)
 
 # add recycled water parcels to parcel data
-ppet <- left_join(ppet, recy, by = "APN") %>% 
+parcel <- left_join(parcel, recy, by = "APN") %>% 
   mutate(Recycled_Water_Connection = ifelse(
     !is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No")
   )
 
-ppet <- add_recycled_water_modified(ppet)
+parcel <- add_recycled_water_modified(parcel, remove_test)
 
-ppet <- add_recycled_water_connection_modified(ppet)
+parcel <- add_recycled_water_connection_modified(parcel, remove_test)
 
 f_progress()
 f_verify_non_duplicates()
@@ -127,14 +130,14 @@ f_verify_non_duplicates()
 # read ewrims data, filter to SON, transform, select relevant cols
 ewrims_key <- f_load_surface_water(data_path)
 
-ppet <- left_join(ppet, ewrims_key) %>% 
+parcel <- left_join(parcel, ewrims_key) %>% 
   mutate(Surface_Water_Connection = ifelse(
     !is.na(Surface_Water_Use_Ac_Ft) & Surface_Water_Use_Ac_Ft > 0, 
     "Yes", "No"))
 
-ppet <- add_surface_water_modified(ppet)
+parcel <- add_surface_water_modified(parcel, remove_test)
 
-ppet <- add_surface_water_connection_modified(ppet)
+parcel <- add_surface_water_connection_modified(parcel, remove_test)
 
 f_progress()
 f_verify_non_duplicates()
@@ -143,7 +146,7 @@ f_verify_non_duplicates()
 ## wells ------------------------------------------------------------------
 
 # Sonoma county wells - deduplicate
-sc_wells <- add_wells(ppet)
+sc_wells <- add_wells(parcel)
 
 # petaluma wells cleaned
 pet_wells <- path(data_path, "pet/public_water_connection",
@@ -166,14 +169,15 @@ all_wells <- bind_rows(sc_wells, pet_wells)
 #it should have changed parcels to no connection instead
 #all_wells <- all_wells %>% filter(!APN %in% ps_wells$APN)
 
-ppet <- calc_wells(ppet, all_wells)
+parcel <- calc_wells(parcel, all_wells)
 
 
-ppet <- ppet %>% replace_Onsite_Well_modified() %>%
-  replace_Well_Records_Available_modified() %>%
-  replace_shared_well_APN_modified() %>%
-  replace_shared_well_modified() %>%
-  replace_active_well_modified()
+parcel <- parcel %>% replace_Onsite_Well_modified( remove_test= remove_test) %>%
+  replace_Well_Records_Available_modified(remove_test= remove_test) %>%
+  replace_shared_well_APN_modified(remove_test= remove_test) %>%
+  replace_shared_well_modified(remove_test= remove_test) %>%
+  replace_active_well_modified(remove_test= remove_test)
+
 
 ## special deactivated wells 
 #deactivated_wells <- path(data_path, "pet/public_water_connection",
@@ -192,9 +196,9 @@ f_verify_non_duplicates()
 # # to avoid duplicates where a parcel falls within more than one water system!
 
 
-wsa_key <- get_wsa_key(ppet, pet)
+wsa_key <- get_wsa_key(parcel, pet)
 
-ppet <- left_join(ppet, wsa_key) %>% 
+parcel <- left_join(parcel, wsa_key) %>% 
   mutate(CA_DrinkingWater_SvcArea_Within = 
            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name),"Yes", "No"))
 
@@ -202,8 +206,8 @@ ppet <- left_join(ppet, wsa_key) %>%
 f_verify_non_duplicates()
 
 
-ppet <-add_public_water_connection(ppet)
-ppet <-pwc_use_code_fix(ppet)
+parcel <-add_public_water_connection(parcel)
+parcel <-pwc_use_code_fix(parcel)
 
 f_progress()
 f_verify_non_duplicates()
@@ -228,14 +232,14 @@ res_use_accessor_key <- readxl::read_xlsx(accessor_key_path,
          Commercial_W_Use_Assessor_Ac_Ft = commercial_industrial_misc_use)
 
 #TODO check UseCode Modified option
-ppet <- replace_use_code(ppet)
+parcel <- replace_use_code(parcel, remove_test)
 
 # add Residential and Commercial Water Use based on Accessor Code
-ppet <- left_join(ppet, res_use_accessor_key) 
+parcel <- left_join(parcel, res_use_accessor_key) 
 
 # Res_GW_Use_Prelim_Ac_Ft is Res_W_Use_Assessor_Ac_Ft if
 # there's no public water connection, otherwise, it's 0
-ppet <- ppet %>% 
+parcel <- parcel %>% 
   mutate(Res_GW_Use_Prelim_Ac_Ft = ifelse(
     Public_Water_Connection == "No", 
     Res_W_Use_Assessor_Ac_Ft,
@@ -243,10 +247,10 @@ ppet <- ppet %>%
   ))
 
 # load modified fields
-ppet <- join_with_modified(ppet)
+parcel <- join_with_modified(parcel, remove_test)
 
 # blank fields to permit revision of the data
-ppet <- ppet %>% 
+parcel <- parcel %>% 
   mutate(
          Res_GW_Use_Ac_Ft = ifelse(Res_GW_Use_Modified == "Yes", 
                                    Res_GW_Use_Modified_Ac_Ft, 
@@ -261,7 +265,7 @@ f_verify_non_duplicates()
 
 # Commercial_GW_Use_Prelim_Ac_Ft is Commercial_W_Use_Assessor_Ac_Ft if
 # there's no public water connection, otherwise, it's 0
-ppet <- ppet %>%
+parcel <- parcel %>%
   mutate(Commercial_GW_Use_Prelim_Ac_Ft = ifelse(
     Public_Water_Connection == "No",
     Commercial_W_Use_Assessor_Ac_Ft,
@@ -269,7 +273,7 @@ ppet <- ppet %>%
   ))
 
 
-ppet <- ppet %>%
+parcel <- parcel %>%
   mutate(
          Commercial_GW_Use_Ac_Ft = ifelse(Commercial_GW_Use_Modified == "Yes",
                                           Commercial_GW_Use_Modified_Ac_Ft,
@@ -284,11 +288,11 @@ f_verify_non_duplicates()
 # dictionary: '(default value is "No")... Parcel sets from GUIDE Survey or 
 # Cities will be used in the future to set to "Yes"'
 
-ppet <- load_urban_wells(data_path, ppet)
-ppet <- replace_urban_well_modified(ppet)
+parcel <- load_urban_wells(data_path, parcel)
+parcel <- replace_urban_well_modified(parcel, remove_test)
 
-ppet <- calc_urban_irrigation(ppet)
-ppet <- add_urban_irrigation_modified(ppet)
+parcel <- calc_urban_irrigation(parcel)
+parcel <- add_urban_irrigation_modified(parcel, remove_test)
 
 f_progress()
 f_verify_non_duplicates()
@@ -300,9 +304,9 @@ f_verify_non_duplicates()
 # https://cimis.water.ca.gov/App_Themes/images/etozonemap.jpg
 # et <- 4.1 
 
-ppet <- calculate_lawn(ppet, pet)
+parcel <- calculate_lawn(parcel, pet)
 
-ppet <- school_golf_calc(ppet)
+parcel <- school_golf_calc(parcel)
 
 f_progress()
 f_verify_non_duplicates()
@@ -311,16 +315,16 @@ f_verify_non_duplicates()
 # crop water use ----------------------------------------------------------
 # Raftelis report document pgs 25-27
 
-ppet <-add_cannabis_modified(ppet)
-crop <-load_land_use(ppet)
-ppet <-calc_crop_water_use(ppet, crop)
+parcel <-add_cannabis_modified(parcel, remove_test)
+crop <-load_land_use(parcel)
+parcel <-calc_crop_water_use(parcel, crop)
 
 
 
 f_verify_non_duplicates()
 
 # calculate groundwater ag water use
-ppet <- calc_ag_use(ppet)
+parcel <- calc_ag_use(parcel)
 
 
 
@@ -329,7 +333,7 @@ f_verify_non_duplicates()
 
 
 # determination for GIS survey --------------------------------------------
-ppet <- gis_survey_determination(ppet)
+parcel <- gis_survey_determination(parcel)
 
 
 f_progress()
@@ -337,13 +341,13 @@ f_verify_non_duplicates()
 
 
 # total calculations ------------------------------------------------------
-ppet <- total_use_calc(ppet, gw_use_rate)
+parcel <- total_use_calc(parcel, gw_use_rate)
 
 
 # final manual tests ------------------------------------------------------
 
 # sanity check: cols that still need to be added
-add[!add %in% colnames(ppet)]
+add[!add %in% colnames(parcel)]
 
 f_progress()
 f_verify_non_duplicates()
@@ -351,6 +355,6 @@ f_verify_non_duplicates()
 
 # write complete parcel data ----------------------------------------------
 
-ppet %>% 
+parcel %>% 
   write_rds(path(data_path, "data_output/pet_parcel_complete.rds"))
 cat("Complete PET.\n")
