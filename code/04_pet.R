@@ -17,7 +17,7 @@ epsg <- as.numeric(Sys.getenv("EPSG"))
 aoi = "ppet"
 
 # remove the test values from the modified tables:
-remove_test <- FALSE
+remove_test <- TRUE
 
 # delete complete DBs
 print('deleting...')

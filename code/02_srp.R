@@ -17,7 +17,7 @@ epsg <- as.numeric(Sys.getenv("EPSG"))
 aoi = "psrp"
 
 # remove the test values from the modified tables:
-remove_test <- FALSE
+remove_test <- TRUE
 
 # delete complete DBs
 gjson_out <- path(data_path, "data_output/srp_parcel_complete.rds")
@@ -129,17 +129,18 @@ parcel$Recycled_Water_Use_Ac_Ft <- NULL
 
 # recycled water delivered to parcels. from SCI 11/1/2022
 recy <- path(data_path, 
-             "srp/recycled_water/updated_rw_totals_all_basins.csv") %>% 
+             "srp/recycled_water/RW_Output_7_10_23.csv") %>% 
   read_csv() %>% 
-  mutate(APN = str_remove(parcel, '-000'))  %>%
-  rename(Recycled_Water_Use_Ac_Ft = recycle_af) %>%
+  mutate(APN = str_remove(PARCEL, '-000'))  %>%
+  rename(Recycled_Water_Use_Ac_Ft = RW_AF_23) %>%
   filter(Recycled_Water_Use_Ac_Ft>0) %>%
-  select(-parcel)
+  select(-PARCEL)
 
 # add recycled water parcels to parcel data
 parcel <- left_join(parcel, recy, by = "APN") %>%
   mutate(Recycled_Water_Connection = ifelse(
-    !is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No"))
+    !is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No"),
+    Recycled_Water_Use_Ac_Ft = replace_na(Recycled_Water_Use_Ac_Ft,0))
 
 
 nmissing<-check_use_codes(parcel,nmissing)

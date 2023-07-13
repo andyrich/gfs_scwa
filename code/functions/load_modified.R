@@ -17,7 +17,7 @@ load_modified_single <- function(sheetname, col1, col2, remove_test = TRUE){
   
   if (remove_test){
     print('removing test fields from modified table')
-    df <- filter(df, ~grepl("test", Comment, ignore.case = TRUE))
+    df <- filter(df, !grepl("test", get(colnames(df)[3]), ignore.case = TRUE))
   }
   
   # check if there are zero rows. empty df creates column types such as logical 
