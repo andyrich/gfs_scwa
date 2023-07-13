@@ -1,6 +1,7 @@
 # function to track progress towards complete database
 f_progress <- function(){
-  aoi_obj = get(aoi)
+  # aoi_obj = get(aoi)
+  aoi_obj = parcel
   percent = round(sum(colnames(aoi_obj) %in% add)/length(add)*100)
   cat(percent, "% complete.\n")
   missing_fields<- fields[!(fields  %in% colnames(aoi_obj))]
@@ -18,7 +19,8 @@ f_progress <- function(){
 
 # function to ensure no duplicates are returned during spatial joins and joins
 f_verify_non_duplicates <- function(){
-  aoi_obj = get(aoi)
+  # aoi_obj = get(aoi)
+  aoi_obj = parcel
   print(nrow(aoi_obj))
   print(nrow(distinct(aoi_obj)))
   print(length(unique(aoi_obj$APN)))

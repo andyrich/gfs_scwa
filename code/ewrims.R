@@ -47,6 +47,9 @@ yearly<- sw %>%
 
 yearly<-column_to_rownames(yearly, var = "APPLICATION_NUMBER")
 
+write_csv(rownames_to_column(yearly, var = "APPLICATION_NUMBER"), 
+          here(data_path,"general/ewrims/water_rights_v3/ewrims_yearly_alldata_raw.csv") )
+
 
 # print(yearly)
 #fill yearly values to the RIGHT after any reported values, keep na to left.
@@ -54,7 +57,7 @@ dfi<-yearly
 c <- !is.na(yearly)
 dfi[c]<-0
 
-dfill<- t(na.locf(t(yearly), fromLast = FALSE ))
+dfill<- t(na.locf(t(dfi), fromLast = FALSE ))
 
 dfill[c]<-yearly[c]
 yearly<-dfill
@@ -64,8 +67,13 @@ yearly<-data.frame(yearly)
 
 write_csv(rownames_to_column(yearly, var = "APPLICATION_NUMBER"), here(data_path,"general/ewrims/water_rights_v3/ewrims_yearly_alldata.csv") )
 
+yearstart = 2013
 
-yearly<-yearly[,(ncol(yearly)-5-1):ncol(yearly)]
+year_list <-paste0('X',yearstart :(yearstart +9))
+
+
+yearly<-yearly[,year_list]
+print(colnames(yearly))
 yearly$MEAN_GSA_DIVERSION <- rowMeans(yearly, na.rm = TRUE) 
 
 

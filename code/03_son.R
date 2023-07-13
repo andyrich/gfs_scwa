@@ -17,6 +17,9 @@ epsg <- as.numeric(Sys.getenv("EPSG"))
 # area of interest object to make helper functions work
 aoi = "pson"
 
+# remove the test values from the modified tables:
+remove_test <- TRUE
+
 # delete complete DBs
 print('deleting...')
 gjson_out <- path(data_path, "data_output/son_parcel_complete.rds")
@@ -31,9 +34,9 @@ accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
 # load data ---------------------------------------------------------------
 
 # preprocessed spatial parcels from Sonoma Co parcels
-pson <- read_rds(path(data_path, "data_output/son_parcel.rds"))
-ppet <- read_rds(path(data_path, "data_output/pet_parcel.rds"))
-psrp <- read_rds(path(data_path, "data_output/srp_parcel.rds"))
+parcel <- read_rds(path(data_path, "data_output/son_parcel.rds"))
+# ppet <- read_rds(path(data_path, "data_output/pet_parcel.rds"))
+# psrp <- read_rds(path(data_path, "data_output/srp_parcel.rds"))
 cat("Loaded preprocedded spatial parcels from Sonoma County.\n")
 
 # final fields to use
@@ -57,15 +60,15 @@ cat("Loaded B118 spatial boundaries per region.\n")
 
 # fields to keep, add, remove ---------------------------------------------
 
-done <- fields[fields %in% colnames(pson)]  # cols already there
-add  <- fields[!fields %in% colnames(pson)] # cols to add
-rem  <- colnames(pson)[!colnames(pson) %in% fields] # cols to remove
+done <- fields[fields %in% colnames(parcel)]  # cols already there
+add  <- fields[!fields %in% colnames(parcel)] # cols to add
+rem  <- colnames(parcel)[!colnames(parcel) %in% fields] # cols to remove
 rem  <- rem[-length(rem)] # don't remove the geometry column
 
 
 # parcel and contact info -------------------------------------------------
 
-pson <-parcel_contact(pson)
+parcel <-parcel_contact(parcel)
 
 f_progress()
 
@@ -73,7 +76,7 @@ f_progress()
 # remove fields -----------------------------------------------------------
 
 # remove fields that should not be in the final database
-pson <- pson %>% select(-all_of(rem))
+parcel <- parcel %>% select(-all_of(rem))
 cat("Removed", length(rem), "fields from parcel database.\n   ",
     paste(rem, collapse = "\n    "))
 
@@ -82,10 +85,10 @@ cat("Removed", length(rem), "fields from parcel database.\n   ",
 
 # Does the parcel overlap SRP, Petaluma, or Sonoma Valley basins?
 # we expect SON overlaps only with PET, see map below:
-pson <- fill_parcel_info(pson, 'Sonoma Valley')
+parcel <- fill_parcel_info(parcel, 'Sonoma Valley')
 
 
-nmissing<-check_use_codes(pson)
+nmissing<-check_use_codes(parcel)
 
 
 f_progress()
@@ -105,22 +108,23 @@ f_progress()
 
 # recycled water delivered to parcels. from SCI 11/1/2022
 recy <- path(data_path, 
-             "son/recycled_water/updated_rw_totals_all_basins.csv") %>% 
+             "son/recycled_water/RW_Output_7_10_23.csv") %>% 
   read_csv() %>% 
-  mutate(APN = str_remove(parcel, '-000'))  %>%
-  rename(Recycled_Water_Use_Ac_Ft = recycle_af) %>%
+  mutate(APN = str_remove(PARCEL, '-000'))  %>%
+  rename(Recycled_Water_Use_Ac_Ft = RW_AF_23) %>%
   filter(Recycled_Water_Use_Ac_Ft>0) %>%
-  select(-parcel)
+  select(-PARCEL)
 
 
 # add recycled water parcels to parcel data
-pson <- left_join(pson, recy, by = "APN") %>% 
+parcel <- left_join(parcel, recy, by = "APN") %>% 
   mutate(Recycled_Water_Connection = ifelse(
-    !is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No"))
+    !is.na(Recycled_Water_Use_Ac_Ft), "Yes", "No"),
+    Recycled_Water_Use_Ac_Ft = replace_na(Recycled_Water_Use_Ac_Ft,0))
 
-pson <- add_recycled_water_modified(pson)
+parcel <- add_recycled_water_modified(parcel, remove_test)
 
-pson <- add_recycled_water_connection_modified(pson)
+parcel <- add_recycled_water_connection_modified(parcel, remove_test)
 
 f_progress()
 
@@ -129,14 +133,14 @@ f_progress()
 # read ewrims data, filter to SON, transform, select relevant cols
 ewrims_key <- f_load_surface_water(data_path)
 
-pson <- left_join(pson, ewrims_key) %>% 
+parcel <- left_join(parcel, ewrims_key) %>% 
   mutate(Surface_Water_Connection = ifelse(
     !is.na(Surface_Water_Use_Ac_Ft) & Surface_Water_Use_Ac_Ft > 0, 
     "Yes", "No"))
 
-pson <- add_surface_water_modified(pson)
+parcel <- add_surface_water_modified(parcel, remove_test)
 
-pson <- add_surface_water_connection_modified(pson)
+parcel <- add_surface_water_connection_modified(parcel, remove_test)
 
 f_progress()
 f_verify_non_duplicates()
@@ -144,16 +148,16 @@ f_verify_non_duplicates()
 
 ## wells ------------------------------------------------------------------
 # Sonoma county wells - deduplicate
-scwells <- add_wells(pson)
-pson <-calc_wells(pson, scwells)
+scwells <- add_wells(parcel)
+parcel <-calc_wells(parcel, scwells)
 
 
 
-pson <- pson %>% replace_Onsite_Well_modified() %>%
-  replace_Well_Records_Available_modified() %>%
-  replace_shared_well_APN_modified() %>%
-  replace_shared_well_modified() %>%
-  replace_active_well_modified() 
+parcel <- parcel %>% replace_Onsite_Well_modified( remove_test= remove_test) %>%
+  replace_Well_Records_Available_modified(remove_test= remove_test) %>%
+  replace_shared_well_APN_modified(remove_test= remove_test) %>%
+  replace_shared_well_modified(remove_test= remove_test) %>%
+  replace_active_well_modified(remove_test= remove_test)
   
  
 f_progress()
@@ -163,9 +167,9 @@ f_verify_non_duplicates()
 ## water service areas ----------------------------------------------------
 
 
-wsa_key <- get_wsa_key(pson, son)
+wsa_key <- get_wsa_key(parcel, son)
 
-pson <- left_join(pson, wsa_key) %>% 
+parcel <- left_join(parcel, wsa_key) %>% 
   mutate(CA_DrinkingWater_SvcArea_Within = 
            ifelse(!is.na(CA_DrinkingWater_SvcArea_Name), "Yes", "No"))
 
@@ -173,14 +177,14 @@ pson <- left_join(pson, wsa_key) %>%
 f_verify_non_duplicates()
 
 
-pson <-add_public_water_connection(pson)
+parcel <-add_public_water_connection(parcel)
 
-nmissing<-check_use_codes(pson,nmissing)
+nmissing<-check_use_codes(parcel,nmissing)
 
 
-pson <-pwc_use_code_fix(pson)
+parcel <-pwc_use_code_fix(parcel)
 
-nmissing<-check_use_codes(pson,nmissing)
+nmissing<-check_use_codes(parcel,nmissing)
 
 
 f_progress()
@@ -254,15 +258,15 @@ res_use_accessor_key <- readxl::read_xlsx(accessor_key_path,
          Commercial_W_Use_Assessor_Ac_Ft = commercial_industrial_misc_use)
 
 #TODO check UseCode Modified option
-pson <- replace_use_code(pson)
-nmissing<-check_use_codes(pson,nmissing)
+parcel <- replace_use_code(parcel, remove_test)
+nmissing<-check_use_codes(parcel,nmissing)
 
 # add Residential and Commercial Water Use based on Accessor Code
-pson <- left_join(pson, res_use_accessor_key) 
+parcel <- left_join(parcel, res_use_accessor_key) 
 
 # Res_GW_Use_Prelim_Ac_Ft is Res_W_Use_Assessor_Ac_Ft if
 # there's no public water connection, otherwise, it's 0
-pson <- pson %>% 
+parcel <- parcel %>% 
   mutate(Res_GW_Use_Prelim_Ac_Ft = ifelse(
     Public_Water_Connection == "No",  
     Res_W_Use_Assessor_Ac_Ft,
@@ -270,11 +274,11 @@ pson <- pson %>%
   ))
 
 # load modified fields
-pson <- join_with_modified(pson)
-nmissing<-check_use_codes(pson,nmissing)
+parcel <- join_with_modified(parcel, remove_test)
+nmissing<-check_use_codes(parcel,nmissing)
 
 # blank fields to permit revision of the data
-pson <- pson %>% 
+parcel <- parcel %>% 
   mutate(Res_GW_Use_Ac_Ft = ifelse(Res_GW_Use_Modified == "Yes", 
                                    Res_GW_Use_Modified_Ac_Ft, 
                                    Res_GW_Use_Prelim_Ac_Ft))
@@ -289,7 +293,7 @@ f_verify_non_duplicates()
 
 # Commercial_GW_Use_Prelim_Ac_Ft is Commercial_W_Use_Assessor_Ac_Ft if
 # there's no public water connection, otherwise, it's 0
-pson <- pson %>% 
+parcel <- parcel %>% 
   mutate(Commercial_GW_Use_Prelim_Ac_Ft = ifelse(
     Public_Water_Connection == "No", 
     Commercial_W_Use_Assessor_Ac_Ft,
@@ -297,7 +301,7 @@ pson <- pson %>%
   ))
 
 # blank fields to permit revision of the data
-pson <- pson %>% 
+parcel <- parcel %>% 
   mutate(Commercial_GW_Use_Ac_Ft          = ifelse(
            Commercial_GW_Use_Modified == "Yes", 
            Commercial_GW_Use_Modified_Ac_Ft, 
@@ -313,11 +317,11 @@ f_verify_non_duplicates()
 # dictionary: '(default value is "No")... Parcel sets from GUIDE Survey or 
 # Cities will be used in the future to set to "Yes"'
 
-pson <- load_urban_wells(data_path, pson)
-pson <- replace_urban_well_modified(pson)
+parcel <- load_urban_wells(data_path, parcel)
+parcel <- replace_urban_well_modified(parcel, remove_test)
 
-pson <- calc_urban_irrigation(pson)
-pson <- add_urban_irrigation_modified(pson)
+parcel <- calc_urban_irrigation(parcel)
+parcel <- add_urban_irrigation_modified(parcel, remove_test)
 
 
 
@@ -330,9 +334,9 @@ f_verify_non_duplicates()
 # Calculate applied water at schools from ET assuming 
 # application efficiency = 0.65 (65%) from Sandoval, 2010. 
 # http://watermanagement.ucdavis.edu/research/application-efficiency/
-pson <- calculate_lawn(pson, son)
+parcel <- calculate_lawn(parcel, son)
 
-pson <- school_golf_calc(pson)
+parcel <- school_golf_calc(parcel)
 
 f_progress()
 f_verify_non_duplicates()
@@ -340,17 +344,17 @@ f_verify_non_duplicates()
 
 # crop water use ----------------------------------------------------------
 # Raftelis report document pgs 25-27
-pson <-add_cannabis_modified(pson)
+parcel <-add_cannabis_modified(parcel, remove_test)
 
-crop <-load_land_use(pson)
-pson <-calc_crop_water_use(pson, crop)
+crop <-load_land_use(parcel)
+parcel <-calc_crop_water_use(parcel, crop)
 
 
 
 f_verify_non_duplicates()
 
 # calculate groundwater ag water use
-pson <- calc_ag_use(pson)
+parcel <- calc_ag_use(parcel)
 
 
 f_progress()
@@ -358,26 +362,26 @@ f_verify_non_duplicates()
 
 
 # determination for GIS survey --------------------------------------------
-pson <- gis_survey_determination(pson)
+parcel <- gis_survey_determination(parcel)
 
-nmissing<-check_use_codes(pson)
+nmissing<-check_use_codes(parcel)
 f_progress()
 f_verify_non_duplicates()
 
     
 # total calculations ------------------------------------------------------
 
-pson <- total_use_calc(pson, gw_use_rate)
+parcel <- total_use_calc(parcel, gw_use_rate)
 # # ensure NA values go to 0 so the result is calculable
 
 
 
 # final manual tests ------------------------------------------------------
-nmissing<-check_use_codes(pson)
+nmissing<-check_use_codes(parcel)
 
 
 # sanity check: cols that still need to be added
-add[!add %in% colnames(pson)]
+add[!add %in% colnames(parcel)]
 
 f_progress()
 f_verify_non_duplicates()
@@ -385,6 +389,6 @@ f_verify_non_duplicates()
 
 # write complete parcel data ----------------------------------------------
 
-pson %>% 
+parcel %>% 
   write_rds(path(data_path, "data_output/son_parcel_complete.rds"))
 cat("Complete SON.\n")

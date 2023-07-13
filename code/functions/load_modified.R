@@ -1,7 +1,7 @@
 # Load modified GW uses for individual parcels. These values will be assigned to their GW use components
 
 
-load_modified_single <- function(sheetname, col1, col2){
+load_modified_single <- function(sheetname, col1, col2, remove_test = TRUE){
   # function to load modified table
   print(paste("loading", sheetname, sep = '  '))
   df <-  readxl::read_xlsx( path(data_path, "general/modified_values",
@@ -14,6 +14,11 @@ load_modified_single <- function(sheetname, col1, col2){
   
   #extra row with APN='APN' is being added. so removing here.
   df <- filter(df,!df$APN=='APN')
+  
+  if (remove_test){
+    print('removing test fields from modified table')
+    df <- filter(df, !grepl("test", get(colnames(df)[3]), ignore.case = TRUE))
+  }
   
   # check if there are zero rows. empty df creates column types such as logical 
   # that cannot be joined with APN
@@ -36,7 +41,7 @@ reduce_dfs <- function(...){
 
 
 
-load_all_modified <- function(){
+load_all_modified <- function(remove_test){
   
   # load all of the modified values from all of the sheets, then join together
   print('loading all modified values')
@@ -62,14 +67,14 @@ load_all_modified <- function(){
 
     )
   
-  df1 = load_modified_single(names(h[1]),h[1][1], h[1][2])
-  df2 = load_modified_single(names(h[2]),h[2][1], h[2][2])
-  df3 = load_modified_single(names(h[3]),h[3][1], h[3][2])
-  df4 = load_modified_single(names(h[4]),h[4][1], h[4][2])
-  df5 = load_modified_single(names(h[5]),h[5][1], h[5][2])
-  df6 = load_modified_single(names(h[6]),h[6][1], h[6][2])
-  df7 = load_modified_single(names(h[7]),h[7][1], h[7][2])
-  df8 = load_modified_single(names(h[8]),h[8][1], h[8][2])
+  df1 = load_modified_single(names(h[1]),h[1][1], h[1][2], remove_test )
+  df2 = load_modified_single(names(h[2]),h[2][1], h[2][2], remove_test )
+  df3 = load_modified_single(names(h[3]),h[3][1], h[3][2], remove_test )
+  df4 = load_modified_single(names(h[4]),h[4][1], h[4][2], remove_test )
+  df5 = load_modified_single(names(h[5]),h[5][1], h[5][2], remove_test )
+  df6 = load_modified_single(names(h[6]),h[6][1], h[6][2], remove_test )
+  df7 = load_modified_single(names(h[7]),h[7][1], h[7][2], remove_test )
+  df8 = load_modified_single(names(h[8]),h[8][1], h[8][2], remove_test )
   
   df = list(df1, df2, df3, df4)
   # df = list(df1, df2, df3, df4, df5,  df6, df7, df8)
@@ -79,9 +84,9 @@ load_all_modified <- function(){
   
   return(dfall)}
 
-join_with_modified <- function(parcel){
+join_with_modified <- function(parcel, remove_test = TRUE){
   # join modified fields to the parcel database
-  modified <- load_all_modified()
+  modified <- load_all_modified(remove_test = remove_test)
   
   cols = colnames(modified)
   print("These are the colnames of the modified database")
@@ -98,9 +103,10 @@ join_with_modified <- function(parcel){
 }
 
 
-replace_use_code <- function(parcel) {
+replace_use_code <- function(parcel, remove_test) {
   
-  df <- load_modified_single('UseCode_Modified', 'UseCode_Modified_Value', 'UseCode_Comment')
+  df <- load_modified_single('UseCode_Modified', 'UseCode_Modified_Value', 'UseCode_Comment', 
+                             remove_test = remove_test)
   
   df <- df %>% 
     mutate(UseCode_Modified_Value = str_pad(UseCode_Modified_Value, 4, "left", "0"))
@@ -114,9 +120,10 @@ replace_use_code <- function(parcel) {
   return(parcel)
 }
 
-add_urban_irrigation_modified <- function(parcel) {
+add_urban_irrigation_modified <- function(parcel, remove_test) {
   print('loading urban irrigation modified')
-  df <- load_modified_single('Urban_Irrigation_Modified', 'Urban_Irrigation_Modified_Ac_Ft', 'Urban_Irrigation_GW_Use_Comment')
+  df <- load_modified_single('Urban_Irrigation_Modified', 'Urban_Irrigation_Modified_Ac_Ft',
+                             'Urban_Irrigation_GW_Use_Comment', remove_test)
   
 
   parcel <- left_join(parcel, df, by = 'APN') %>%
@@ -130,9 +137,12 @@ add_urban_irrigation_modified <- function(parcel) {
   return(parcel)
 }
 
-add_surface_water_connection_modified <- function(parcel) {
+add_surface_water_connection_modified <- function(parcel, remove_test) {
   print('loading surface water connection')
-  df <- load_modified_single('Surface_Water_Connection_Modified', 'Surface_Water_Connection_Modified_Value', 'Surface_Water_Connection_Modified_Comment')
+  df <- load_modified_single('Surface_Water_Connection_Modified', 
+                             'Surface_Water_Connection_Modified_Value', 
+                             'Surface_Water_Connection_Modified_Comment',
+                             remove_test)
   
   check_dfs_column_names_for_dups(parcel, df)
   
@@ -150,9 +160,11 @@ add_surface_water_connection_modified <- function(parcel) {
   return(parcel)
 }
 
-add_surface_water_modified <- function(parcel) {
+add_surface_water_modified <- function(parcel, remove_test) {
   print('loading surface water modified')
-  df <- load_modified_single('Surface_Water_Use_Modified', 'Surface_Water_Use_Modified_Ac_Ft', 'Surface_Water_Comment')
+  df <- load_modified_single('Surface_Water_Use_Modified',
+                             'Surface_Water_Use_Modified_Ac_Ft',
+                             'Surface_Water_Comment', remove_test)
 
   check_dfs_column_names_for_dups(parcel, df)
   
@@ -172,9 +184,12 @@ add_surface_water_modified <- function(parcel) {
   return(parcel)
 }
   
-add_recycled_water_connection_modified <- function(parcel) {
+add_recycled_water_connection_modified <- function(parcel, remove_test) {
   print('loading recycled water connection')
-  df <- load_modified_single('Recycled_Water_Connection_Modified', 'Recycled_Water_Connection_Modified_Value', 'Recycled_Water_Connection_Modified_Comment')
+  df <- load_modified_single('Recycled_Water_Connection_Modified',
+                             'Recycled_Water_Connection_Modified_Value',
+                             'Recycled_Water_Connection_Modified_Comment', 
+                             remove_test)
   
   # df <-   mutate(df, 
   #                Recycled_Water_Connection = ifelse(
@@ -199,9 +214,12 @@ add_recycled_water_connection_modified <- function(parcel) {
   return(parcel)
 }
 
-add_recycled_water_modified <- function(parcel) {
+add_recycled_water_modified <- function(parcel, remove_test) {
   print('loading recycled water modified')
-  df <- load_modified_single('Recycled_Water_Use_Modified', 'Recycled_Water_Use_Modified_Ac_Ft', 'Recycled_Water_Use_Comment')
+  df <- load_modified_single('Recycled_Water_Use_Modified', 
+                             'Recycled_Water_Use_Modified_Ac_Ft',
+                             'Recycled_Water_Use_Comment',
+                             remove_test)
   
   
   check_dfs_column_names_for_dups(parcel, df)
@@ -219,9 +237,9 @@ add_recycled_water_modified <- function(parcel) {
   return(parcel)
 }
 
-replace_active_well_modified <- function(parcel) {
+replace_active_well_modified <- function(parcel, remove_test) {
   
-  df <- load_modified_single('Active_Well_Modified', 'Active_Well_Modified_Value', 'Comment')
+  df <- load_modified_single('Active_Well_Modified', 'Active_Well_Modified_Value', 'Comment', remove_test)
   
   df$Comment <- NULL
   
@@ -234,9 +252,9 @@ replace_active_well_modified <- function(parcel) {
   return(parcel)
 }
 
-replace_shared_well_modified <- function(parcel) {
+replace_shared_well_modified <- function(parcel, remove_test) {
   
-  df <- load_modified_single('Shared_Well_Modified', 'Shared_Well_Modified_Value', 'Comment')
+  df <- load_modified_single('Shared_Well_Modified', 'Shared_Well_Modified_Value', 'Comment', remove_test)
   
   df$Comment <- NULL
   
@@ -260,9 +278,11 @@ replace_shared_well_modified <- function(parcel) {
   return(parcel)
 }
 
-replace_shared_well_APN_modified <- function(parcel) {
+replace_shared_well_APN_modified <- function(parcel, remove_test) {
   print('loading replace_Well_Records_Available_modified')
-  df <- load_modified_single('Shared_Well_APN_Modified', 'Shared_Well_APN_Modified_Value', 'Comment')
+  df <- load_modified_single('Shared_Well_APN_Modified', 
+                             'Shared_Well_APN_Modified_Value',
+                             'Comment', remove_test)
   
   df$Comment <- NULL
   
@@ -286,9 +306,11 @@ replace_shared_well_APN_modified <- function(parcel) {
   return(parcel)
 }
 
-replace_Well_Records_Available_modified <- function(parcel) {
+replace_Well_Records_Available_modified <- function(parcel, remove_test) {
   print('loading replace_Well_Records_Available_modified')
-  df <- load_modified_single('Well_Records_Available_Modified', 'Well_Records_Available_Modified_Value', 'Comment')
+  df <- load_modified_single('Well_Records_Available_Modified',
+                             'Well_Records_Available_Modified_Value',
+                             'Comment', remove_test)
   
   df$Comment <- NULL
   check_dfs_column_names_for_dups(parcel, df)
@@ -300,9 +322,12 @@ replace_Well_Records_Available_modified <- function(parcel) {
   return(parcel)
 }
 
-replace_Onsite_Well_modified <- function(parcel) {
+replace_Onsite_Well_modified <- function(parcel, remove_test) {
   
-  df <- load_modified_single('Onsite_Well_Modified', 'Onsite_Well_Modified_Value', 'Comment')
+  df <- load_modified_single('Onsite_Well_Modified', 
+                             'Onsite_Well_Modified_Value', 
+                             'Comment', 
+                             remove_test)
   
   df$Comment <- NULL
   
@@ -315,9 +340,12 @@ replace_Onsite_Well_modified <- function(parcel) {
   return(parcel)
 }
 
-replace_urban_well_modified <- function(parcel) {
+replace_urban_well_modified <- function(parcel, remove_test) {
   
-  df <- load_modified_single('Urban_Well_Modified', 'Urban_Well_Modified_Value', 'Comment')
+  df <- load_modified_single('Urban_Well_Modified', 
+                             'Urban_Well_Modified_Value',
+                             'Comment', 
+                             remove_test)
   
   df$Comment <- NULL
   
@@ -330,9 +358,12 @@ replace_urban_well_modified <- function(parcel) {
   return(parcel)
 }
 
-add_gsa_jurisdiction_modified <- function(parcel) {
+add_gsa_jurisdiction_modified <- function(parcel, remove_test) {
   
-  df <- load_modified_single('GSA_Jurisdiction_Modified', 'GSA_Jurisdiction_Mod_Value', 'Comment')
+  df <- load_modified_single('GSA_Jurisdiction_Modified',
+                             'GSA_Jurisdiction_Mod_Value', 
+                             'Comment', 
+                             remove_test)
   
   df$Comment <- NULL
   
@@ -353,9 +384,12 @@ add_gsa_jurisdiction_modified <- function(parcel) {
 }
 
 
-add_cannabis_modified <- function(parcel) {
+add_cannabis_modified <- function(parcel, remove_test) {
   print('loading cannabis modified')
-  df <- load_modified_single('Cannabis_Water_Use_Modified', 'Cannabis_Water_Use_Modified_Ac_Ft', 'Cannabis_Water_Use_Comment')
+  df <- load_modified_single('Cannabis_Water_Use_Modified',
+                             'Cannabis_Water_Use_Modified_Ac_Ft',
+                             'Cannabis_Water_Use_Comment', 
+                             remove_test)
   
   check_dfs_column_names_for_dups(parcel, df)
   

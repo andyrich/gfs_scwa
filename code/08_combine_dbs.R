@@ -47,11 +47,11 @@ dup <- Reduce(rbind,
 
 all <- bind_rows(dup, nondup)
 
-all <-add_gsa_jurisdiction_modified(all)
+all <-add_gsa_jurisdiction_modified(all, remove_test = TRUE)
 
 
 parcel_old <- path(
-  data_path, "data_output/archive/output_as_of_05162023/soco_gsas_parcel.csv")
+  data_path, "data_output/archive/output_as_of_10192022/soco_gsas_parcel.csv")
 
 print(parcel_old)
 # find if values have been changed for the 'Updated_value' field
