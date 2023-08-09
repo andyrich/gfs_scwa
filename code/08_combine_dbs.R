@@ -70,7 +70,7 @@ all <- left_join(all, old, by='APN') %>%
 
 
 # write to shp and csv
-
+total_sum <- sum(all$Total_Groundwater_Use_Ac_Ft)
 all %>% 
   st_drop_geometry() %>% 
   write_csv(path(data_path, "data_output/soco_gsas_parcel.csv"))
@@ -132,3 +132,6 @@ all_og_labels %>%
   st_drop_geometry() %>% 
   write_csv(shp_sci_out)
 print('done writing shapefile')
+
+print("the final sum of the GUIDE is:")
+print(total_sum)
