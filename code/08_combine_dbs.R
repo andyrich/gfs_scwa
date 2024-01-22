@@ -51,7 +51,7 @@ all <-add_gsa_jurisdiction_modified(all, remove_test = TRUE)
 
 
 parcel_old <- path(
-  data_path, "data_output/archive/output_as_of_10192022/soco_gsas_parcel.csv")
+  data_path, "data_output/archive/output_as_of_08032023/soco_gsas_parcel.csv")
 
 print(parcel_old)
 # find if values have been changed for the 'Updated_value' field
@@ -70,7 +70,7 @@ all <- left_join(all, old, by='APN') %>%
 
 
 # write to shp and csv
-
+total_sum <- sum(all$Total_Groundwater_Use_Ac_Ft)
 all %>% 
   st_drop_geometry() %>% 
   write_csv(path(data_path, "data_output/soco_gsas_parcel.csv"))
@@ -132,3 +132,6 @@ all_og_labels %>%
   st_drop_geometry() %>% 
   write_csv(shp_sci_out)
 print('done writing shapefile')
+
+print("the final sum of the GUIDE is:")
+print(total_sum)

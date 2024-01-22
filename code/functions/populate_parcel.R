@@ -40,11 +40,7 @@ parcel_contact <-function(parcel){
       UseCode_Description = UseCDesc,
       UseCode_Category    = UseCType,
       CurrentOwnerName    = NA,
-      MailingAddress1     = MailAdr1,
-      MailingAddress2     = MailAdr2,
-      MailingAddress3     = MailAdr3,
-      MailingAddress4     = MailAdr4,
-      Situs_Address       = SitusFmt1)
+      Situs_Address       = SitusFormatted1)
   
   parcel <- parcel %>%
     mutate(Jurisdiction = ifelse(CityType == 'Incorporated',
