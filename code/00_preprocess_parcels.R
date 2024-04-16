@@ -5,6 +5,9 @@ library(mapview)
 library(fs)
 library(furrr)
 
+#Description:
+## create parcel inputs used for each Subbasin's code.
+## Needs to be ran only once when new parcel data is obtained
 
 dir_ls(here("code/functions")) %>% walk(~source(.x))
 f_load_dotenv() 

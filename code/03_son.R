@@ -37,15 +37,10 @@ accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
 parcel <- read_rds(path(data_path, "data_output/son_parcel.rds"))
 # ppet <- read_rds(path(data_path, "data_output/pet_parcel.rds"))
 # psrp <- read_rds(path(data_path, "data_output/srp_parcel.rds"))
-cat("Loaded preprocedded spatial parcels from Sonoma County.\n")
+cat("Loaded preprocessed spatial parcels from Sonoma County.\n")
 
 # final fields to use
 fields <- get_schema_fields(data_path)
-# fields <- path(data_path, "schema/2022_07_21 GSA Schema from RP.xlsx") %>% 
-#   readxl::read_xlsx(sheet = 1, range = cellranger::cell_cols("B")) %>% 
-#   set_names("name") %>% 
-#   filter(!is.na(name)) %>% 
-#   pull(name)
 fields <- c(fields, "UseCode", 'edge') # add use code and drop it later
 
 # GSA spatial data
@@ -165,7 +160,7 @@ f_verify_non_duplicates()
 
 
 ## water service areas ----------------------------------------------------
-
+# from functions/public_water_connnections.R
 
 wsa_key <- get_wsa_key(parcel, son)
 
@@ -257,7 +252,7 @@ res_use_accessor_key <- readxl::read_xlsx(accessor_key_path,
          Res_W_Use_Assessor_Ac_Ft = residential_use, 
          Commercial_W_Use_Assessor_Ac_Ft = commercial_industrial_misc_use)
 
-#TODO check UseCode Modified option
+# replace use code with modified values
 parcel <- replace_use_code(parcel, remove_test)
 nmissing<-check_use_codes(parcel,nmissing)
 

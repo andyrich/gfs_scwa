@@ -35,8 +35,6 @@ accessor_key_path <- path(data_path, "general", "water_use_by_accessor_code",
 
 
 # preprocessed spatial parcels from Sonoma Co parcels
-# pson <- read_rds(path(data_path, "data_output/son_parcel.rds"))
-# ppet <- read_rds(path(data_path, "data_output/pet_parcel.rds"))
 parcel <- read_rds(path(data_path, "data_output/srp_parcel.rds"))
 cat("Loaded preprocedded spatial parcels from Sonoma County.\n")
 
@@ -48,8 +46,6 @@ fields <- c(fields, "UseCode", 'edge') # add use code and drop it later
 b118_path <- path(data_path, "general/b118/i08_B118_v6-1.shp") 
 
 # gsa spatial data: petaluma, sonoma valley, santa rosa plain
-# son <- f_load_b118_basin(b118_path, "NAPA-SONOMA VALLEY - SONOMA VALLEY")
-# pet <- f_load_b118_basin(b118_path, "PETALUMA VALLEY")
 srp <- f_load_b118_basin(b118_path, "SANTA ROSA VALLEY - SANTA ROSA PLAIN")
 cat("Loaded B118 spatial boundaries per region.\n")
 
@@ -88,19 +84,13 @@ nmissing<-check_use_codes(parcel)
 
 
 # basin boundary parcels --------------------------------------------------
-
-# Does the parcel overlap SRP, Petaluma, or Sonoma Valley basins?
-# we expect SON overlaps only with PET, see map below:
-# mapview::mapview(list(son, pet, srp))
-
-# # parcels that intersect multiple basins have duplicate APN across databases
-# boundary_parcels <- psrp$APN[psrp$APN %in% ppet$APN]
+## parcels should be charged in multiple basins. duplicates will be addressed in final script
 
 parcel <- fill_parcel_info(parcel, 'Santa Rosa Plain')
 
 
-# overwrite all of the above work, have default be that basin is Santa Rosa Plain Will
-# be recalculated at combine_db
+# have default be that basin is Santa Rosa Plain Will
+# be recalculated in combine_db
 parcel <- parcel %>% 
   mutate(GSA_Jurisdiction_Prelim = "Santa Rosa Plain",
          Basin_Boundary_Parcel = edge)%>% select(-edge)
@@ -108,9 +98,6 @@ parcel <- parcel %>%
 nmissing<-check_use_codes(parcel,nmissing)
 
 f_progress()
-
-
-### add parcel land size
 
 
 # water sources -----------------------------------------------------------
@@ -212,17 +199,10 @@ parcel <- parcel %>% replace_Onsite_Well_modified( remove_test= remove_test) %>%
 
 nmissing<-check_use_codes(parcel,nmissing)
 ## water service areas ----------------------------------------------------
-
-# water service areas in SON
-
-
-# # rm Shelly's work
-
-
+# water service areas
 # # add water service areas to parcel data, first need to summarize data
 # # to avoid duplicates where a parcel falls within more than one water system!
-
-
+# from functions/public_water_connnections.R
 
 wsa_key <- get_wsa_key(parcel, srp)
 
@@ -256,11 +236,7 @@ f_verify_non_duplicates()
 
 # urban wells -------------------------------------------------------------
 
-
-
-
 # public water system reported use from SWRCB -----------------------------
-
 
 
 # residential water use ---------------------------------------------------
@@ -268,8 +244,7 @@ f_verify_non_duplicates()
 # The Urban Residential Groundwater user class represents residential properties
 # in areas served by water service providers that also have a well on the 
 # property... Raftelis and Staff assumed that these wells would primarily be 
-# used for irrigation purposes... it is assumed that Urban Residential Groundwater 
-# Users extract on average 0.1 AF per parcel per year for irrigation purposes.
+# used for irrigation purposes... 
 
 # Res_W_Use_Assessor_Ac_Ft = Water use rate based off assessor use code
 
@@ -287,7 +262,7 @@ res_use_accessor_key <- readxl::read_xlsx(accessor_key_path,
 #   select(-all_of(c("Res_W_Use_Assessor_Ac_Ft",
 #                    "Commercial_W_Use_Assessor_Ac_Ft")))
 
-
+# replace use code with modified values
 parcel <- replace_use_code(parcel, remove_test)
 
 nmissing<-check_use_codes(parcel,nmissing)
@@ -313,15 +288,11 @@ parcel <- parcel %>%
          Res_GW_Use_Ac_Ft = ifelse(Res_GW_Use_Modified == "Yes",
                                    Res_GW_Use_Modified_Ac_Ft,
                                    Res_GW_Use_Prelim_Ac_Ft))
-# 
-# f_progress()
-# f_verify_non_duplicates()
+
 
 nmissing<-check_use_codes(parcel,nmissing)
 
 # commercial water use ----------------------------------------------------
-
-
 # Commercial_GW_Use_Prelim_Ac_Ft is Commercial_W_Use_Assessor_Ac_Ft if
 # there's no public water connection, otherwise, it's 0
 parcel <- parcel %>%
