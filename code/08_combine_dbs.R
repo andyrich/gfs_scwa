@@ -19,7 +19,7 @@ ppet <- read_rds(path(data_path, "data_output/pet_parcel_complete.rds"))
 # ensure same crs
 map_dbl(list(psrp, pson, ppet), ~st_crs(.x)$epsg) 
 
-# assign JurisDiction, then selet record below
+# assign JurisDiction, then select record below
 psrp$GSA_Jurisdiction_Prelim <- "Santa Rosa Plain"
 ppet$GSA_Jurisdiction_Prelim <- "Petaluma Valley"
 pson$GSA_Jurisdiction_Prelim <- "Sonoma Valley"
@@ -49,18 +49,16 @@ all <- bind_rows(dup, nondup)
 
 all <-add_gsa_jurisdiction_modified(all, remove_test = TRUE)
 
-
+# load a previous version of the GUIDE to highlight parcels with changes in GW use
 parcel_old <- path(
   data_path, "data_output/archive/output_as_of_08032023/soco_gsas_parcel.csv")
 
-print(parcel_old)
 # find if values have been changed for the 'Updated_value' field
 old <- read_csv(parcel_old, col_select = c('APN', 'Total_Groundwater_Use_Ac_Ft'))
 
 old <- old %>%
   select( APN, Total_Groundwater_Use_Ac_Ft ) %>%
           rename(Total_GW_old = Total_Groundwater_Use_Ac_Ft)
-print(colnames(old))
 
 all <- left_join(all, old, by='APN') %>% 
             mutate(Change_in_GW = Total_GW_old - Total_Groundwater_Use_Ac_Ft) %>%

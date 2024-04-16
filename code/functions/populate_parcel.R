@@ -344,6 +344,9 @@ calc_ag_use <-function(parcel){
     Ag_Surface_Recycled_Actual_Use_Ac_Ft > Water_Use_Ag_Rate_Ac_Ft,
     Water_Use_Ag_Rate_Ac_Ft, Ag_Surface_Recycled_Actual_Use_Ac_Ft))
 
+  #TODO: add check to verify that 
+  # 0 = 'Water_Use_Ag_Rate_Ac_Ft'-  ('Ag_Surface_Recycled_Actual_Use_Ac_Ft')  -'Ag_GW_Use_GIS_Ac_Ft'
+  
 # No Idle Acres to start - this is reported
   parcel <- parcel %>% mutate(Idle_Ac = 0)
 

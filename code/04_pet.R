@@ -194,7 +194,7 @@ f_verify_non_duplicates()
 # water service areas in SON
 # # add water service areas to parcel data, first need to summarize data
 # # to avoid duplicates where a parcel falls within more than one water system!
-
+# from functions/public_water_connnections.R
 
 wsa_key <- get_wsa_key(parcel, pet)
 
@@ -231,7 +231,7 @@ res_use_accessor_key <- readxl::read_xlsx(accessor_key_path,
          Res_W_Use_Assessor_Ac_Ft = residential_use, 
          Commercial_W_Use_Assessor_Ac_Ft = commercial_industrial_misc_use)
 
-#TODO check UseCode Modified option
+# replace use code with modified values
 parcel <- replace_use_code(parcel, remove_test)
 
 # add Residential and Commercial Water Use based on Accessor Code

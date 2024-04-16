@@ -46,7 +46,7 @@ infolder <-"C:/Users/arich/West Yost Associates/SRP GSA Administrative Services 
 dest <- path(data_path,'srp', 'recycled_water')
 copy_the_files(infolder, dest, list_only  = list_only, file_type = "*.csv")
 
-# copy recycled water -SRP- file
+# copy recycled water -SON- file
 data_path <- Sys.getenv("DATA_PATH")
 infolder <-"C:/Users/arich/West Yost Associates/SRP GSA Administrative Services - GUIDE & Fee Updates/sonoma_co_gsas_rate_fee/son/recycled_water"
 dest <- path(data_path,'son', 'recycled_water')
