@@ -9,7 +9,7 @@
 * Sonoma Valley  
 * Petaluma Valley  
 
-This repo generates the parcel database of 93 fields (including geometry) for each GSA.  
+This repo generates the parcel database of MANY fields (including geometry) for each GSA.  
 
 
 # Getting started
@@ -132,7 +132,7 @@ The shema is loaded by get_schema function.
 The 02_SRP.R, 03_SON.R and 04_PET.R each produce an R database to the path(data_path, "data_output") folder. The completed database is named the son_parcel_compete.rds, for example. These 3 files are then combined via the combine_dbs.R script to produce the soco_gsas_parcel_prmd.csv, soco_gsas_parcel_sci.csv, and soco_gsas_parcel.csv, and the soco_parcel_geom_only.geojson. The various outputs reflect the naming conventions preferred by each group and the **soco_gsas_parcel_prmd.csv is the final version for establishing fees**. The naming conventions and ordering are  established in the columns named: 'PRMD Public Database Field Name' and	'PRMD Public Database Order'. Fields left blank are removed from the final output databse.
 The soco_parcel_geom_only.geojson is the geometry portion of the data for visualization or GIS purposes.
 
-For methods, see `docs/memo.docx`.
+For methods, see `docs/memo.docx`. <span style="color:green">**This document is out-of-date.**</span>
 
 
 ## Running the pipeline
